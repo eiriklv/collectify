@@ -1,0 +1,25 @@
+{
+  "name": "collectify",
+  "version": "1.0.0",
+  "description": "A functional version of congregator collector",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Eirik Vullum <evullum@gmail.com> (http://www.evconsult.no/)",
+  "license": "ISC",
+  "dependencies": {
+    "asap": "^2.0.0",
+    "asfy": "^1.0.1",
+    "async": "^0.9.0",
+    "convict": "^0.6.1",
+    "debug": "^2.1.1",
+    "feed-mapper": "git+https://github.com/eiriklv/feed-mapper",
+    "highland": "^2.3.0",
+    "json-mapper": "git+https://github.com/eiriklv/json-mapper",
+    "lodash": "^2.4.1",
+    "mongoose": "^3.8.21",
+    "site-parser": "git+https://github.com/eiriklv/site-parser"
+  },
+  "devDependencies": {}
+}
