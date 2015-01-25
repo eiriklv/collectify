@@ -26,7 +26,7 @@ var queryFunction = models.Source.find.bind(models.Source, query);
 var isEqual = hl.ncurry(2, _.isEqual);
 
 var sourceStream = hl(helpers.sourceWrapper(queryFunction))
-  .ratelimit(1, 1000)
+  .ratelimit(1, 2000)
   .take(10)
   .errors(helpers.handleErrors)
   .compact()
@@ -40,11 +40,11 @@ var jsonStream = sourceStream
       hl.get('type')
     )
   )
-  .flatMap(
+  .map(
     hl.wrapCallback(
       jsonMapper.parse.bind(jsonMapper)
     )
-  )
+  ).parallel(5)
 
 var rssStream = sourceStream
   .fork()
@@ -54,11 +54,11 @@ var rssStream = sourceStream
       hl.get('type')
     )
   )
-  .flatMap(
+  .map(
     hl.wrapCallback(
       feedMapper.parse.bind(feedMapper)
     )
-  )
+  ).parallel(5)
 
 var siteStream = sourceStream
   .fork()
@@ -68,11 +68,11 @@ var siteStream = sourceStream
       hl.get('type')
     )
   )
-  .flatMap(
+  .map(
     hl.wrapCallback(
       siteParser.parse.bind(siteParser)
     )
-  )
+  ).parallel(5)
 
 var articleStream = hl([jsonStream, rssStream, siteStream])
   .merge()
