@@ -33,6 +33,13 @@ var siteParser = require('site-parser')({
  * Create streams for the channels
  * on which we want to
  * distribute / emit data.
+ *
+ * This uses the push-version
+ * of the interface, but you
+ * could also use the pull-version,
+ * to enable load balancing
+ * and back-pressure between
+ * processes
  */
 var existingChannel = InterprocessTransmitter({
   channel: 'articles:existing',
