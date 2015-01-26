@@ -10,8 +10,13 @@ var setup = require('./setup');
 var models = require('./models')(mongoose);
 var InterprocessTransmitter = require('interprocess-push-stream').Transmitter;
 
-var eventEmitter = new EventEmitter();
-
+/**
+ * Create instances of our
+ * mapping functions.
+ *
+ * Here we are going to map from
+ * templates to arrays of articles.
+ */
 var jsonMapper = require('json-mapper')({
   timeOut: 10000
 });
@@ -24,6 +29,11 @@ var siteParser = require('site-parser')({
   timeOut: 10000
 });
 
+/**
+ * Create streams for the channels
+ * on which we want to
+ * distribute / emit data.
+ */
 var existingChannel = InterprocessTransmitter({
   channel: 'articles:existing',
   prefix: config.get('database.redis.prefix'),
@@ -42,14 +52,46 @@ var errorChannel = InterprocessTransmitter({
   url: config.get('database.redis.url')
 });
 
+/**
+ * Create a new event-emitter
+ * which we are going to use
+ * for errors
+ */
+var eventEmitter = new EventEmitter();
+
+/**
+ * Create an stream for
+ * all errors emitted
+ * in the process
+ */
 var errorStream = _('error', eventEmitter);
 
+/**
+ * Create a curryed
+ * helper function to
+ * check if two objects
+ * are equal (primitives as well)
+ */
 var isEqual = hl.ncurry(2, _.isEqual);
 
+/**
+ * Create a partially applied
+ * bound function for fetching
+ * data from the database.
+ *
+ * In this case templates/sources.
+ */
 var queryFunction = models.Source.find.bind(models.Source, {
   active: true
 });
 
+/**
+ * Create a stream
+ * from our query function above
+ * - limit the rate to 1 fetch / 2 seconds
+ * - do this only 10 times
+ * - emit all errors via the event-emitter
+ */
 var sourceStream = hl(helpers.sourceWrapper(queryFunction))
   .ratelimit(1, 2000)
   .take(10)
@@ -62,6 +104,17 @@ var sourceStream = hl(helpers.sourceWrapper(queryFunction))
   .compact()
   .flatten()
 
+/**
+ * Create a stream that
+ * filters all the sources/templates,
+ * selects only those of type 'json'.
+ *
+ * Map all of the templates
+ * via the jsonMapper to
+ * get a list of articles
+ *
+ * Process only 5 templates in parallel
+ */
 var jsonStream = sourceStream
   .fork()
   .filter(
@@ -76,6 +129,17 @@ var jsonStream = sourceStream
     )
   ).parallel(5)
 
+/**
+ * Create a stream that
+ * filters all the sources/templates,
+ * selects only those of type 'feed'.
+ *
+ * Map all of the templates
+ * via the feedMapper to
+ * get a list of articles
+ *
+ * Process only 5 templates in parallel
+ */
 var rssStream = sourceStream
   .fork()
   .filter(
@@ -90,6 +154,18 @@ var rssStream = sourceStream
     )
   ).parallel(5)
 
+
+/**
+ * Create a stream that
+ * filters all the sources/templates,
+ * selects only those of type 'site'.
+ *
+ * Map all of the templates
+ * via the siteParser to
+ * get a list of articles
+ *
+ * Process only 5 templates in parallel
+ */
 var siteStream = sourceStream
   .fork()
   .filter(
@@ -104,6 +180,19 @@ var siteStream = sourceStream
     )
   ).parallel(5)
 
+/**
+ * Create a stream that merges
+ * all the article streams
+ * into a single stream.
+ *
+ * Flatten the input,
+ * so that arrays of articles
+ * are converted to a stream
+ * of single articles
+ *
+ * Emit all errors via
+ * the event-emitter
+ */
 var articleStream = hl([jsonStream, rssStream, siteStream])
   .merge()
   .flatten()
@@ -114,6 +203,17 @@ var articleStream = hl([jsonStream, rssStream, siteStream])
     )
   )
 
+/**
+ * Create a stream that
+ * filters the articleStream
+ * and keeps only the articles
+ * that does not already exist
+ *
+ * - In this case our predicate
+ * is that if we get a count === 0
+ * for the 'guid' we define it
+ * as new
+ */
 var newArticleStream = articleStream
   .fork()
   .flatFilter(
@@ -127,6 +227,17 @@ var newArticleStream = articleStream
     )
   )
 
+/**
+ * Create a stream that
+ * filters the articleStream
+ * and keeps only the articles
+ * that already exist
+ *
+ * - In this case our predicate
+ * is that if we get a count > 0
+ * for the 'guid' we define it
+ * as existing
+ */
 var existingArticleStream = articleStream
   .fork()
   .flatFilter(
@@ -139,16 +250,33 @@ var existingArticleStream = articleStream
     )
   )
 
+/**
+ * Connect to the database
+ */
 setup.connectToDatabase(
   mongoose,
   config.get('database.mongo.url')
 );
 
+/**
+ * Pipe all new articles to
+ * the channel defined
+ * for new articles
+ */
 newArticleStream
   .pipe(newChannel)
 
+/**
+ * Pipe all new articles to
+ * the channel defined
+ * for existing articles
+ */
 existingArticleStream
   .pipe(existingChannel)
 
+/**
+ * Pipe all errors
+ * to the error channel
+ */
 errorStream
   .pipe(errorChannel)
