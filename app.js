@@ -151,7 +151,7 @@ var rssStream = sourceStream
   .fork()
   .filter(
     hl.compose(
-      isEqual('rss'),
+      isEqual('feed'),
       hl.get('type')
     )
   )
