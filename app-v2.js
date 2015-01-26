@@ -10,6 +10,7 @@ var helpers = require('./helpers');
 var config = require('./config');
 var setup = require('./setup');
 var models = require('./models')(mongoose);
+var InterprocessTransmitter = require('interprocess-push-stream').Transmitter;
 
 /**
  * Test templates
@@ -38,6 +39,36 @@ var feedMapper = require('feed-mapper')({
 
 var siteParser = require('site-parser')({
   timeOut: 10000
+});
+
+/**
+ * Create streams for the channels
+ * on which we want to
+ * distribute / emit data.
+ *
+ * This uses the push-version
+ * of the interface, but you
+ * could also use the pull-version,
+ * to enable load balancing
+ * and back-pressure between
+ * processes
+ */
+var updatedChannel = InterprocessTransmitter({
+  channel: 'articles:updated',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
+
+var newChannel = InterprocessTransmitter({
+  channel: 'articles:new',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
+
+var errorChannel = InterprocessTransmitter({
+  channel: 'error',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
 });
 
 /**
@@ -291,26 +322,6 @@ setup.connectToDatabase(
 );
 
 /**
- * Pipe all new articles to
- * the channel defined
- * for new articles
- */
-newArticleStream
-  .fork()
-  .map(helpers.inspectDebug(debug, 'new-stream'))
-  .resume()
-
-/**
- * Pipe all new articles to
- * the channel defined
- * for existing articles
- */
-existingArticleStream
-  .fork()
-  .map(helpers.inspectDebug(debug, 'existing-stream'))
-  .resume()
-
-/**
  * Log all the saved
  * articles and the
  * resulting entries in
@@ -319,7 +330,7 @@ existingArticleStream
 savedArticleStream
   .fork()
   .map(helpers.inspectDebug(debug, 'saved-stream'))
-  .resume()
+  .pipe(newChannel)
 
 /**
  * Log all the updated
@@ -330,7 +341,7 @@ savedArticleStream
 updatedArticleStream
   .fork()
   .map(helpers.inspectDebug(debug, 'updated-stream'))
-  .resume()
+  .pipe(updatedChannel)
 
 /**
  * Pipe all errors
@@ -339,3 +350,4 @@ updatedArticleStream
 errorStream
   .map(helpers.inspectDebug(debug, 'error-stream'))
   .resume()
+  .pipe(errorChannel)

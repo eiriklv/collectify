@@ -87,6 +87,15 @@ exports = module.exports = [{
     "containers": [{
       "selector": "article",
       "elements": [{
+        "name": "guid",
+        "type": "url",
+        "occurence": "first",
+        "required": true,
+        "items": [{
+          "selector": "section h2 a",
+          "attribute": "href"
+        }]
+      }, {
         "name": "url",
         "type": "url",
         "occurence": "first",
@@ -96,23 +105,11 @@ exports = module.exports = [{
           "attribute": "href"
         }]
       }, {
-        "name": "author",
-        "occurence": "first",
-        "items": [{
-          "selector": "section h3 span a"
-        }]
-      }, {
         "name": "title",
         "required": true,
         "occurence": "first",
         "items": [{
           "selector": "section h2 a"
-        }]
-      }, {
-        "name": "description",
-        "occurence": "first",
-        "items": [{
-          "selector": "p.p-summary"
         }]
       }, {
         "name": "image",
