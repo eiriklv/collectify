@@ -13,17 +13,31 @@ var models = require('./models')(mongoose);
 
 /**
  * Test templates
+ * if we need to
+ * do some testing
+ * without involving
+ * mongoose/mongodb
  *
  * Contains one of each type
  * - feed (rss)
  * - json (api end-point)
- * - site (html parsing)
+ * - site (html)
  */
 var templates = require('./templates');
 
 /**
+ * Create some curryed
+ * helper functions to
+ * 
+ * - check if two objects are equal (primitives as well)
+ * - pick properties from objects
+ */
+var isEqual = hl.ncurry(2, _.isEqual);
+var pick = hl.ncurry(2, hl.flip(_.pick));
+
+/**
  * Create instances of our
- * mapping functions.
+ * mappers/parsers.
  *
  * Here we are going to map from
  * templates to arrays of articles.
@@ -54,26 +68,20 @@ var eventEmitter = new EventEmitter();
 var emit = hl.ncurry(2, eventEmitter.emit.bind(eventEmitter));
 
 /**
- * Create an stream for
- * all errors emitted
- * in the process
+ * Create an stream 
+ * where we'll
+ * collect all the
+ * errors emitted
+ * throughout the
+ * the stream pipeline(s)
  */
 var errorStream = hl('error', eventEmitter);
 
 /**
- * Create some curryed
- * helper functions to
- * 
- * - check if two objects are equal (primitives as well)
- * - pick properties from objects
- */
-var isEqual = hl.ncurry(2, _.isEqual);
-var pick = hl.ncurry(2, hl.flip(_.pick));
-
-/**
  * Create a partially applied
  * bound function for fetching
- * data from the database.
+ * data from the database
+ * using mongoose.
  *
  * In this case templates/sources.
  */
@@ -88,12 +96,25 @@ var queryFunction = models.Source.find.bind(models.Source, {
  * - do this only 10 times
  * - emit all errors via the event-emitter
  */
-//var realSource = hl(helpers.sourceWrapper(queryFunction));
+var realSource = hl(helpers.sourceWrapper(queryFunction));
+
+/**
+ * Create a stream from
+ * our test templates
+ * without accessing the
+ * database
+ */
 var testSource = hl([templates]);
-var sourceStream = testSource
-  //.take(10)
-  //.ratelimit(1, 10000)
-  .errors(emit('error'))
+
+/**
+ * Create a stream
+ * from our source
+ * of choice
+ * - limit the rate to 1 fetch / 10 seconds
+ * - emit all errors via the event-emitter
+ */
+var sourceStream = realSource
+  .ratelimit(1, 10000)
   .compact()
   .flatten()
 
