@@ -16,6 +16,7 @@
     "debug": "^2.1.1",
     "feed-mapper": "git+https://github.com/eiriklv/feed-mapper",
     "highland": "^2.3.0",
+    "interprocess-push-stream": "git://github.com/eiriklv/interprocess-push-stream",
     "json-mapper": "git+https://github.com/eiriklv/json-mapper",
     "lodash": "^2.4.1",
     "mongoose": "^3.8.21",

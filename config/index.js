@@ -22,6 +22,18 @@ var config = module.exports = convict({
         default: 'mongodb://localhost/collectify',
         env: 'MONGO_URL'
       }
+    },
+    redis: {
+      url: {
+        doc: 'Redis url to connect to (including auth string)',
+        default: 'redis://localhost:6379',
+        env: 'REDIS_URL'
+      },
+      prefix: {
+        doc: 'Redis prefix',
+        default: '',
+        env: 'REDIS_PREFIX'
+      }
     }
   }
 });

@@ -2,33 +2,63 @@ var hl = require('highland');
 var _ = require('lodash');
 var async = require('async');
 var asfy = require('asfy');
+var EventEmitter = require('events').EventEmitter;
 var mongoose = require('mongoose');
 var helpers = require('./helpers');
 var config = require('./config');
 var setup = require('./setup');
 var models = require('./models')(mongoose);
+var InterprocessTransmitter = require('interprocess-push-stream').Transmitter;
 
-var options = {
+var eventEmitter = new EventEmitter();
+
+var jsonMapper = require('json-mapper')({
   timeOut: 10000
-};
+});
 
-var jsonMapper = require('json-mapper')(options);
-var feedMapper = require('feed-mapper')(options);
-var siteParser = require('site-parser')(options);
+var feedMapper = require('feed-mapper')({
+  timeOut: 10000
+});
 
-setup.connectToDatabase(mongoose, config.get('database.mongo.url'));
+var siteParser = require('site-parser')({
+  timeOut: 10000
+});
 
-var query = {
-  active: true
-};
+var existingChannel = InterprocessTransmitter({
+  channel: 'articles:existing',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
 
-var queryFunction = models.Source.find.bind(models.Source, query);
+var newChannel = InterprocessTransmitter({
+  channel: 'articles:new',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
+
+var errorChannel = InterprocessTransmitter({
+  channel: 'error',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
+
+var errorStream = _('error', eventEmitter);
+
 var isEqual = hl.ncurry(2, _.isEqual);
+
+var queryFunction = models.Source.find.bind(models.Source, {
+  active: true
+});
 
 var sourceStream = hl(helpers.sourceWrapper(queryFunction))
   .ratelimit(1, 2000)
   .take(10)
-  .errors(helpers.handleErrors)
+  .errors(
+    eventEmitter.emit.bind(
+      eventEmitter,
+      'error'
+    )
+  )
   .compact()
   .flatten()
 
@@ -77,22 +107,14 @@ var siteStream = sourceStream
 var articleStream = hl([jsonStream, rssStream, siteStream])
   .merge()
   .flatten()
-  .errors(helpers.handleErrors)
-
-var newArticleStream = articleStream
-  .fork()
-  .flatFilter(
-    hl.wrapCallback(
-      async.compose(
-        asfy(helpers.isTruthy),
-        models.Entry.count,
-        asfy(hl.get('guid'))
-      )
+  .errors(
+    eventEmitter.emit.bind(
+      eventEmitter,
+      'error'
     )
   )
-  .each(hl.log)
 
-var existingArticleStream = articleStream
+var newArticleStream = articleStream
   .fork()
   .flatFilter(
     hl.wrapCallback(
@@ -104,4 +126,26 @@ var existingArticleStream = articleStream
       )
     )
   )
-  .each(hl.log)
+
+var existingArticleStream = articleStream
+  .fork()
+  .flatFilter(
+    hl.wrapCallback(
+      async.compose(
+        asfy(helpers.isTruthy),
+        models.Entry.count,
+        asfy(hl.get('guid'))
+      )
+    )
+  )
+
+setup.connectToDatabase(mongoose, config.get('database.mongo.url'));
+
+newArticleStream
+  .pipe(newChannel)
+
+existingArticleStream
+  .pipe(existingChannel)
+
+errorStream
+  .pipe(errorChannel)
