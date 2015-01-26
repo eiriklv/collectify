@@ -1,4 +1,5 @@
 exports = module.exports = [{
+  "active": true,
   "type": "feed",
   "name": "TheWireCutter",
   "url": "http://feeds.feedburner.com/TheWirecutter",
@@ -39,6 +40,7 @@ exports = module.exports = [{
     }]
   }
 }, {
+  "active": true,
   "type": "json",
   "name": "Mashable",
   "url": "http://mashable.com/stories.json?hot_per_page=0&new_per_page=30&rising_per_page=0",
@@ -76,6 +78,7 @@ exports = module.exports = [{
     }]
   }
 }, {
+  "active": true,
   "type": "site",
   "name": "New Yorker",
   "url": "http://www.newyorker.com/",
