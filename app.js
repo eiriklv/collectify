@@ -139,7 +139,10 @@ var existingArticleStream = articleStream
     )
   )
 
-setup.connectToDatabase(mongoose, config.get('database.mongo.url'));
+setup.connectToDatabase(
+  mongoose,
+  config.get('database.mongo.url')
+);
 
 newArticleStream
   .pipe(newChannel)
