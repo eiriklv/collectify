@@ -1,5 +1,24 @@
 exports = module.exports = function(mongoose) {
   var entrySchema = new mongoose.Schema({
+    _ranking: {
+      type: Number,
+      required: true,
+      index: true
+    },
+    _source: {
+      type: String,
+      required: true,
+      index: true
+    },
+    _origin: {
+      type: String,
+      required: true
+    },
+    _host: {
+      type: String,
+      required: true,
+      index: true,
+    },
     guid: {
       type: String,
       required: true,
@@ -11,25 +30,6 @@ exports = module.exports = function(mongoose) {
       required: true,
       index: true
     },
-    ranking: {
-      type: Number,
-      required: true,
-      index: true
-    },
-    source: {
-      type: String,
-      required: true,
-      index: true
-    },
-    origin: {
-      type: String,
-      required: true
-    },
-    host: {
-      type: String,
-      required: true,
-      index: true,
-    },
     title: {
       type: String,
       required: true
@@ -37,12 +37,9 @@ exports = module.exports = function(mongoose) {
     image: {
       type: String
     },
-    description: {
-      type: String
-    },
-    content: mongoose.Schema.Types.Mixed,
     posted: {
       type: Date,
+      default: Date.now,
       required: true
     },
     createdAt: {

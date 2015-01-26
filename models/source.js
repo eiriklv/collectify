@@ -4,7 +4,7 @@ exports = module.exports = function(mongoose) {
       type: Boolean,
       default: false
     },
-    origin: {
+    type: {
       type: String,
       required: true
     },
@@ -18,26 +18,17 @@ exports = module.exports = function(mongoose) {
       index: true,
       unique: true
     },
-    linkref: {
+    listref: {
       type: String
-    },
-    tags: {
-      type: Array,
-      required: true
     },
     format: {
       type: String,
-      required: true
-    },
-    body: {
-      type: Boolean,
-      default: false
     },
     template: {
       type: mongoose.Schema.Types.Mixed,
       required: true
     }
   });
-  // create the model for articles and return it
+
   return mongoose.model('source', sourceSchema);
 };
