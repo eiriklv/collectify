@@ -1,6 +1,10 @@
-exports = module.exports = function(fn) {
+var util = require('util');
+
+exports = module.exports = function(logger, name) {
   return function(value) {
-    fn.call(this, value);
+    logger(name, util.inspect(value, {
+      colors: true
+    }));
     return value;
   };
 };

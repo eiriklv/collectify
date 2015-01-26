@@ -349,7 +349,7 @@ setup.connectToDatabase(
  */
 savedArticleStream
   .fork()
-  .map(helpers.inspectDebug(debug, 'saved-stream'))
+  .map(helpers.inspect(debug, 'saved-stream'))
   .pipe(newChannel)
 
 /**
@@ -360,7 +360,7 @@ savedArticleStream
  */
 updatedArticleStream
   .fork()
-  .map(helpers.inspectDebug(debug, 'updated-stream'))
+  .map(helpers.inspect(debug, 'updated-stream'))
   .pipe(updatedChannel)
 
 /**
@@ -368,5 +368,5 @@ updatedArticleStream
  * to the error channel
  */
 errorStream
-  .map(helpers.inspectDebug(debug, 'error-stream'))
+  .map(helpers.inspect(debug, 'error-stream'))
   .pipe(errorChannel)

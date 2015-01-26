@@ -318,7 +318,7 @@ setup.connectToDatabase(
  */
 newArticleStream
   .fork()
-  .map(helpers.inspectDebug(debug, 'new-stream'))
+  .map(helpers.inspect(debug, 'new-stream'))
   .resume()
 
 /**
@@ -328,7 +328,7 @@ newArticleStream
  */
 existingArticleStream
   .fork()
-  .map(helpers.inspectDebug(debug, 'existing-stream'))
+  .map(helpers.inspect(debug, 'existing-stream'))
   .resume()
 
 /**
@@ -339,7 +339,7 @@ existingArticleStream
  */
 savedArticleStream
   .fork()
-  .map(helpers.inspectDebug(debug, 'saved-stream'))
+  .map(helpers.inspect(debug, 'saved-stream'))
   .resume()
 
 /**
@@ -350,7 +350,7 @@ savedArticleStream
  */
 updatedArticleStream
   .fork()
-  .map(helpers.inspectDebug(debug, 'updated-stream'))
+  .map(helpers.inspect(debug, 'updated-stream'))
   .resume()
 
 /**
@@ -358,5 +358,5 @@ updatedArticleStream
  * to the error channel
  */
 errorStream
-  .map(helpers.inspectDebug(debug, 'error-stream'))
+  .map(helpers.inspect(debug, 'error-stream'))
   .resume()
