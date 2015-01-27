@@ -121,10 +121,8 @@ var queryFunction = models.Source.find.bind(models.Source, {
 
 /**
  * Create a stream
- * from our query function above
- * - limit the rate to 1 fetch / 2 seconds
- * - do this only 10 times
- * - emit all errors via the event-emitter
+ * with our query function
+ * as the source
  */
 var realSource = hl(helpers.sourceWrapper(queryFunction));
 
