@@ -52,7 +52,7 @@ exports = module.exports = function(mongoose) {
 
   entrySchema.set('toObject', {
     transform: function(doc, ret, options) {
-      delete ret._id;
+      // delete ret._id;
       delete ret.__v;
       // delete ret.createdAt; enable this if you do not want to update the expiry
     }
@@ -60,7 +60,7 @@ exports = module.exports = function(mongoose) {
 
   entrySchema.set('toJSON', {
     transform: function(doc, ret, options) {
-      delete ret._id;
+      // delete ret._id;
       delete ret.__v;
       // delete ret.createdAt; enable this if you do not want to update the expiry
     }
