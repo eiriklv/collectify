@@ -115,6 +115,7 @@ var sourceStream = realSource
   .ratelimit(1, 10000)
   .compact()
   .flatten()
+  .errors(emit('error'))
 
 /**
  * Create a stream that
@@ -136,6 +137,7 @@ var jsonStream = sourceStream
   .map(hl.wrapCallback(
     jsonMapper.parse.bind(jsonMapper)
   )).parallel(5)
+  .errors(emit('error'))
 
 /**
  * Create a stream that
@@ -157,6 +159,7 @@ var rssStream = sourceStream
   .map(hl.wrapCallback(
     feedMapper.parse.bind(feedMapper)
   )).parallel(5)
+  .errors(emit('error'))
 
 
 /**
@@ -179,6 +182,7 @@ var siteStream = sourceStream
   .map(hl.wrapCallback(
     siteParser.parse.bind(siteParser)
   )).parallel(5)
+  .errors(emit('error'))
 
 /**
  * Create a stream that merges
@@ -200,6 +204,7 @@ var articleStream = hl([
   ])
   .merge()
   .flatten()
+  .errors(emit('error'))
 
 /**
  * Create a stream that
@@ -222,6 +227,7 @@ var newArticleStream = articleStream
       asyncify(pick('guid'))
     )
   ))
+  .errors(emit('error'))
 
 /**
  * Create a stream that
@@ -243,6 +249,7 @@ var existingArticleStream = articleStream
       asyncify(pick('guid'))
     )
   ))
+  .errors(emit('error'))
 
 /**
  * Create a stream that
@@ -258,6 +265,7 @@ var savedArticleStream = newArticleStream
   .map(hl.wrapCallback(
     models.Entry.create.bind(models.Entry)
   )).parallel(10)
+  .errors(emit('error'))
 
 /**
  * Create a stream that
@@ -275,30 +283,12 @@ var updatedArticleStream = existingArticleStream
       asyncify(helpers.isTruthy),
       models.Entry.update.bind(models.Entry),
       helpers.formatForUpdate(['guid']),
-      asyncify(hl.flip(hl.extend)({
+      asyncify(hl.extend({
         createdAt: Date.now()
       }))
+      asyncify(hl.flip(hl.extend)({}))
     )
   ))
-
-/**
- * Handle the errors from all
- * the stream in one single
- * handler
- */
-var totalStream = hl([
-    sourceStream,          //* redundant in our case
-    jsonStream,            //* redundant in our case
-    siteStream,            //* redundant in our case
-    rssStream,             //* redundant in our case
-    articleStream,         //* redundant in our case
-    newArticleStream,      //* redundant in our case
-    existingArticleStream, //* redundant in our case
-    savedArticleStream,
-    updatedArticleStream
-  ])
-  .merge()
-  .observe()
   .errors(emit('error'))
 
 /**
