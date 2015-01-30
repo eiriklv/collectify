@@ -29,7 +29,7 @@ var templates = require('./templates');
 /**
  * Create some curryed
  * helper functions to
- * 
+ *
  * - check if two objects are equal (primitives as well)
  * - pick properties from objects
  */
@@ -99,7 +99,7 @@ var eventEmitter = new EventEmitter();
 var emit = hl.ncurry(2, eventEmitter.emit.bind(eventEmitter));
 
 /**
- * Create an stream 
+ * Create a stream
  * where we'll
  * collect all the
  * errors emitted
@@ -141,7 +141,7 @@ var testSource = hl([templates]);
  * - limit the rate to 1 fetch / 10 seconds
  * - emit all errors via the event-emitter
  */
-var sourceStream = realSource
+var sourceStream = testSource
   .ratelimit(1, 10000)
   .compact()
   .flatten()
@@ -308,16 +308,23 @@ var savedArticleStream = newArticleStream
  */
 var updatedArticleStream = existingArticleStream
   .fork()
+  .map(
+    hl.compose(
+      hl.extend({
+        createdAt: Date.now()
+      }),
+      hl.flip(hl.extend)({})
+    ))
   .flatFilter(hl.wrapCallback(
     async.compose(
       asyncify(helpers.isTruthy),
       models.Entry.update.bind(models.Entry),
-      helpers.formatForUpdate(['guid']),
-      asyncify(hl.extend({
-        createdAt: Date.now()
-      }))
-      asyncify(hl.flip(hl.extend)({}))
+      helpers.formatForUpdate(['guid'])
     )
+  ))
+  .map(pick('guid'))
+  .flatMap(hl.wrapCallback(
+    models.Entry.findOne.bind(models.Entry)
   ))
   .errors(emit('error'))
 
