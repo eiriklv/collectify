@@ -293,9 +293,9 @@ var updatedArticleStream = existingArticleStream
     )
   ))
   .map(pick('guid'))
-  .flatMap(hl.wrapCallback(
+  .map(hl.wrapCallback(
     models.Entry.findOne.bind(models.Entry)
-  ))
+  )).parallel(10)
   .errors(emit('error'))
 
 /**
