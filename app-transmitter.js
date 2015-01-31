@@ -331,6 +331,9 @@ var savedArticleStream = newArticleStream
 var updatedArticleStream = existingArticleStream
   .fork()
   .map(copy)
+  .map(hl.extend({
+    createdAt: 0
+  }))
   .map(transformToSync({
     createdAt: Date.now
   }))
