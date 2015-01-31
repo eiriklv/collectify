@@ -37,6 +37,9 @@ exports = module.exports = function(mongoose) {
     image: {
       type: String
     },
+    content: {
+      type: String
+    },
     posted: {
       type: Date,
       default: Date.now,

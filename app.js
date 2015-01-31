@@ -10,6 +10,8 @@ var helpers = require('./helpers');
 var config = require('./config');
 var setup = require('./setup');
 var models = require('./models')(mongoose);
+var read = require('node-read');
+var obtr = require('object-transform');
 
 /**
  * Test templates
@@ -34,6 +36,10 @@ var templates = require('./templates');
  */
 var isEqual = hl.ncurry(2, _.isEqual);
 var pick = hl.ncurry(2, hl.flip(_.pick));
+var has = hl.curry(hl.flip(_.has));
+var transformTo = hl.curry(obtr.transformTo);
+var copyFromTo = hl.curry(obtr.copy);
+var copy = hl.compose(hl.flip(hl.extend)({}));
 
 /**
  * Create instances of our
@@ -265,26 +271,26 @@ var savedArticleStream = newArticleStream
   .map(hl.wrapCallback(
     models.Entry.create.bind(models.Entry)
   )).parallel(10)
+  .invoke('toObject')
   .errors(emit('error'))
 
 /**
  * Create a stream that
  * forks the existingArticleStream
  * and updates all the entries
- * in the database
+ * in the database with a new timestamp
  *
  * The result is the data
  * passed back from mongoose
  */
 var updatedArticleStream = existingArticleStream
   .fork()
-  .map(
-    hl.compose(
-      hl.extend({
-        createdAt: Date.now()
-      }),
-      hl.flip(hl.extend)({})
-    ))
+  .map(hl.compose(
+    hl.extend({
+      createdAt: Date.now()
+    }),
+    copy
+  ))
   .flatFilter(hl.wrapCallback(
     async.compose(
       asyncify(helpers.isTruthy),
@@ -296,6 +302,45 @@ var updatedArticleStream = existingArticleStream
   .map(hl.wrapCallback(
     models.Entry.findOne.bind(models.Entry)
   )).parallel(10)
+  .invoke('toObject')
+  .errors(emit('error'))
+
+/**
+ * Create a stream that
+ * forks the updatedArticleStream
+ * and updates all the entries
+ * in the database with article / website content,
+ * if it does not already have it
+ *
+ * The result is the data
+ * passed back from mongoose
+ */
+var addedContentStream = updatedArticleStream
+  .fork()
+  .reject(has('content'))
+  .map(copyFromTo({
+    url: ['content']
+  }))
+  .map(hl.wrapCallback(
+    transformTo({
+      content: async.compose(
+        asyncify(hl.get('content')),
+        read
+      )
+    })
+  )).parallel(10)
+  .flatFilter(hl.wrapCallback(
+    async.compose(
+      asyncify(helpers.isTruthy),
+      models.Entry.update.bind(models.Entry),
+      helpers.formatForUpdate(['guid'])
+    )
+  ))
+  .map(pick('guid'))
+  .map(hl.wrapCallback(
+    models.Entry.findOne.bind(models.Entry)
+  )).parallel(10)
+  .invoke('toObject')
   .errors(emit('error'))
 
 /**
@@ -346,6 +391,15 @@ savedArticleStream
 updatedArticleStream
   .fork()
   .map(helpers.inspect(debug, 'updated-stream'))
+  .resume()
+
+/**
+ * Log all articles
+ * updated with content
+ */
+addedContentStream
+  .fork()
+  .map(helpers.inspect(debug, 'content-stream'))
   .resume()
 
 /**
