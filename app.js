@@ -37,27 +37,6 @@ httpAgent.maxSockets = 50;
 var templates = require('./templates');
 
 /**
- * Create some curryed
- * helper functions to
- *
- * - check if two objects are equal (primitives as well)
- * - pick properties from objects
- */
-
-var isEqual = hl.ncurry(2, _.isEqual);
-var pick = hl.ncurry(2, hl.flip(_.pick));
-var has = hl.curry(hl.flip(_.has));
-var transformTo = hl.curry(obtr.transformTo);
-var copyFromTo = hl.curry(obtr.copy);
-var copy = hl.compose(hl.flip(hl.extend)({}));
-var getContentFromURL = hl.ncurry(3, _.rearg(nodeRead, 1, 0, 2));
-var findOneEntry = hl.ncurry(4, _.rearg(models.Entry.findOne.bind(models.Entry), 2, 1, 0, 3));
-var createEntry = models.Entry.create.bind(models.Entry);
-var countEntries = models.Entry.count.bind(models.Entry);
-var updateEntry = models.Entry.update.bind(models.Entry);
-var findSources = hl.ncurry(4, _.rearg(models.Source.find.bind(models.Source), 2, 1, 0, 3));
-
-/**
  * Create instances of our
  * mappers/parsers.
  *
@@ -75,6 +54,31 @@ var feedMapper = require('feed-mapper')({
 var siteParser = require('site-parser')({
   timeOut: 10000
 });
+
+/**
+ * Create some curryed
+ * helper functions to
+ *
+ * - check if two objects are equal (primitives as well)
+ * - pick properties from objects
+ */
+var wrap = hl.wrapCallback.bind(hl);
+var isEqual = hl.ncurry(2, _.isEqual);
+var pick = hl.ncurry(2, hl.flip(_.pick));
+var has = hl.curry(hl.flip(_.has));
+var transformTo = hl.curry(obtr.transformTo);
+var transformToSync = hl.curry(obtr.transformToSync);
+var copyFromTo = hl.curry(obtr.copy);
+var copy = hl.compose(hl.flip(hl.extend)({}));
+var getContentFromURL = hl.ncurry(3, _.rearg(nodeRead, 1, 0, 2));
+var findOneEntry = hl.ncurry(4, _.rearg(models.Entry.findOne.bind(models.Entry), 2, 1, 0, 3));
+var createEntry = models.Entry.create.bind(models.Entry);
+var countEntries = models.Entry.count.bind(models.Entry);
+var updateEntry = models.Entry.update.bind(models.Entry);
+var findSources = hl.ncurry(4, _.rearg(models.Source.find.bind(models.Source), 2, 1, 0, 3));
+var transformHTML = siteParser.parse.bind(siteParser);
+var transformRSS = feedMapper.parse.bind(feedMapper);
+var transformJSON = jsonMapper.parse.bind(jsonMapper);
 
 /**
  * Create a new event-emitter
@@ -130,13 +134,16 @@ var testSource = hl([templates]);
  * Create a stream
  * from our source
  * of choice
- * - limit the rate to 1 fetch / 10 seconds
+ * - limit the rate to 1 fetch / 30 seconds
+ * - compact and flatten the stream
+ * - limit the rate to 10 templates / 1 seconds
  * - emit all errors via the event-emitter
  */
 var sourceStream = realSource
-  .ratelimit(1, 10000)
+  .ratelimit(1, 30000)
   .compact()
   .flatten()
+  .ratelimit(10, 1000)
   .errors(emit('error'))
 
 /**
@@ -156,9 +163,8 @@ var jsonStream = sourceStream
     isEqual('json'),
     hl.get('type')
   ))
-  .map(hl.wrapCallback(
-    jsonMapper.parse.bind(jsonMapper)
-  )).parallel(5)
+  .map(wrap(transformJSON))
+  .parallel(5)
   .errors(emit('error'))
 
 /**
@@ -178,9 +184,7 @@ var rssStream = sourceStream
     isEqual('feed'),
     hl.get('type')
   ))
-  .map(hl.wrapCallback(
-    feedMapper.parse.bind(feedMapper)
-  )).parallel(5)
+  .map(wrap(transformRSS)).parallel(5)
   .errors(emit('error'))
 
 
@@ -201,9 +205,7 @@ var siteStream = sourceStream
     isEqual('site'),
     hl.get('type')
   ))
-  .map(hl.wrapCallback(
-    siteParser.parse.bind(siteParser)
-  )).parallel(5)
+  .map(wrap(transformHTML)).parallel(5)
   .errors(emit('error'))
 
 /**
@@ -241,7 +243,7 @@ var articleStream = hl([
  */
 var newArticleStream = articleStream
   .fork()
-  .flatFilter(hl.wrapCallback(
+  .flatFilter(wrap(
     async.compose(
       asyncify(hl.not),
       asyncify(helpers.isTruthy),
@@ -264,7 +266,7 @@ var newArticleStream = articleStream
  */
 var existingArticleStream = articleStream
   .fork()
-  .flatFilter(hl.wrapCallback(
+  .flatFilter(wrap(
     async.compose(
       asyncify(helpers.isTruthy),
       countEntries,
@@ -284,9 +286,7 @@ var existingArticleStream = articleStream
  */
 var savedArticleStream = newArticleStream
   .fork()
-  .map(hl.wrapCallback(
-    createEntry
-  )).parallel(100000)
+  .map(wrap(createEntry)).parallel(100000)
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -301,13 +301,11 @@ var savedArticleStream = newArticleStream
  */
 var updatedArticleStream = existingArticleStream
   .fork()
-  .map(hl.compose(
-    hl.extend({
-      createdAt: Date.now()
-    }),
-    copy
-  ))
-  .flatFilter(hl.wrapCallback(
+  .map(copy)
+  .map(transformToSync({
+    createdAt: Date.now
+  }))
+  .flatFilter(wrap(
     async.compose(
       asyncify(helpers.isTruthy),
       updateEntry,
@@ -315,9 +313,7 @@ var updatedArticleStream = existingArticleStream
     )
   ))
   .map(pick('guid'))
-  .map(hl.wrapCallback(
-    findOneEntry({})('')
-  )).parallel(100000)
+  .map(wrap(findOneEntry({}, ''))).parallel(100000)
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -337,7 +333,7 @@ var addedContentStream = updatedArticleStream
   .map(copyFromTo({
     url: ['content']
   }))
-  .map(hl.wrapCallback(
+  .map(wrap(
     transformTo({
       content: async.compose(
         asyncify(hl.get('content')),
@@ -347,7 +343,7 @@ var addedContentStream = updatedArticleStream
       )
     })
   )).parallel(50)
-  .flatFilter(hl.wrapCallback(
+  .flatFilter(wrap(
     async.compose(
       asyncify(helpers.isTruthy),
       updateEntry,
@@ -355,9 +351,7 @@ var addedContentStream = updatedArticleStream
     )
   ))
   .map(pick('guid'))
-  .map(hl.wrapCallback(
-    findOneEntry({})('')
-  )).parallel(100000)
+  .map(wrap(findOneEntry({}, ''))).parallel(100000)
   .invoke('toObject')
   .errors(emit('error'))
 
