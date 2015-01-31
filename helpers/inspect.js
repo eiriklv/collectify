@@ -5,6 +5,5 @@ exports = module.exports = function(logger, name) {
     logger(name, util.inspect(value, {
       colors: true
     }));
-    return value;
   };
 };

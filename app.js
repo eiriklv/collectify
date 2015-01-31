@@ -1,4 +1,5 @@
 var debug = require('debug')('collectify:main-app');
+var http = require('http');
 var hl = require('highland');
 var _ = require('lodash');
 var async = require('async');
@@ -10,8 +11,16 @@ var helpers = require('./helpers');
 var config = require('./config');
 var setup = require('./setup');
 var models = require('./models')(mongoose);
-var read = require('node-read');
+var nodeRead = require('node-read');
 var obtr = require('object-transform');
+
+/**
+ * Create an http agent
+ * to set the max
+ * amount of open sockets
+ */
+var httpAgent = new http.Agent();
+httpAgent.maxSockets = 50;
 
 /**
  * Test templates
@@ -34,12 +43,19 @@ var templates = require('./templates');
  * - check if two objects are equal (primitives as well)
  * - pick properties from objects
  */
+
 var isEqual = hl.ncurry(2, _.isEqual);
 var pick = hl.ncurry(2, hl.flip(_.pick));
 var has = hl.curry(hl.flip(_.has));
 var transformTo = hl.curry(obtr.transformTo);
 var copyFromTo = hl.curry(obtr.copy);
 var copy = hl.compose(hl.flip(hl.extend)({}));
+var getContentFromURL = hl.ncurry(3, _.rearg(nodeRead, 1, 0, 2));
+var findOneEntry = hl.ncurry(4, _.rearg(models.Entry.findOne.bind(models.Entry), 2, 1, 0, 3));
+var createEntry = models.Entry.create.bind(models.Entry);
+var countEntries = models.Entry.count.bind(models.Entry);
+var updateEntry = models.Entry.update.bind(models.Entry);
+var findSources = hl.ncurry(4, _.rearg(models.Source.find.bind(models.Source), 2, 1, 0, 3));
 
 /**
  * Create instances of our
@@ -91,7 +107,7 @@ var errorStream = hl('error', eventEmitter);
  *
  * In this case templates/sources.
  */
-var queryFunction = models.Source.find.bind(models.Source, {
+var queryFunction = findSources({})('')({
   active: true
 });
 
@@ -229,7 +245,7 @@ var newArticleStream = articleStream
     async.compose(
       asyncify(hl.not),
       asyncify(helpers.isTruthy),
-      models.Entry.count.bind(models.Entry),
+      countEntries,
       asyncify(pick('guid'))
     )
   ))
@@ -251,7 +267,7 @@ var existingArticleStream = articleStream
   .flatFilter(hl.wrapCallback(
     async.compose(
       asyncify(helpers.isTruthy),
-      models.Entry.count.bind(models.Entry),
+      countEntries,
       asyncify(pick('guid'))
     )
   ))
@@ -269,8 +285,8 @@ var existingArticleStream = articleStream
 var savedArticleStream = newArticleStream
   .fork()
   .map(hl.wrapCallback(
-    models.Entry.create.bind(models.Entry)
-  )).parallel(10)
+    createEntry
+  )).parallel(100000)
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -294,14 +310,14 @@ var updatedArticleStream = existingArticleStream
   .flatFilter(hl.wrapCallback(
     async.compose(
       asyncify(helpers.isTruthy),
-      models.Entry.update.bind(models.Entry),
+      updateEntry,
       helpers.formatForUpdate(['guid'])
     )
   ))
   .map(pick('guid'))
   .map(hl.wrapCallback(
-    models.Entry.findOne.bind(models.Entry)
-  )).parallel(10)
+    findOneEntry({})('')
+  )).parallel(100000)
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -325,21 +341,23 @@ var addedContentStream = updatedArticleStream
     transformTo({
       content: async.compose(
         asyncify(hl.get('content')),
-        read
+        getContentFromURL({
+          agent: httpAgent
+        })
       )
     })
-  )).parallel(10)
+  )).parallel(50)
   .flatFilter(hl.wrapCallback(
     async.compose(
       asyncify(helpers.isTruthy),
-      models.Entry.update.bind(models.Entry),
+      updateEntry,
       helpers.formatForUpdate(['guid'])
     )
   ))
   .map(pick('guid'))
   .map(hl.wrapCallback(
-    models.Entry.findOne.bind(models.Entry)
-  )).parallel(10)
+    findOneEntry({})('')
+  )).parallel(100000)
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -358,7 +376,7 @@ setup.connectToDatabase(
  */
 newArticleStream
   .fork()
-  .map(helpers.inspect(debug, 'new-stream'))
+  .doto(helpers.inspect(debug, 'new-stream'))
   .resume()
 
 /**
@@ -368,7 +386,7 @@ newArticleStream
  */
 existingArticleStream
   .fork()
-  .map(helpers.inspect(debug, 'existing-stream'))
+  .doto(helpers.inspect(debug, 'existing-stream'))
   .resume()
 
 /**
@@ -379,7 +397,7 @@ existingArticleStream
  */
 savedArticleStream
   .fork()
-  .map(helpers.inspect(debug, 'saved-stream'))
+  .doto(helpers.inspect(debug, 'saved-stream'))
   .resume()
 
 /**
@@ -390,7 +408,7 @@ savedArticleStream
  */
 updatedArticleStream
   .fork()
-  .map(helpers.inspect(debug, 'updated-stream'))
+  .doto(helpers.inspect(debug, 'updated-stream'))
   .resume()
 
 /**
@@ -399,7 +417,7 @@ updatedArticleStream
  */
 addedContentStream
   .fork()
-  .map(helpers.inspect(debug, 'content-stream'))
+  .doto(helpers.inspect(debug, 'content-stream'))
   .resume()
 
 /**
@@ -407,5 +425,5 @@ addedContentStream
  * to the error channel
  */
 errorStream
-  .map(helpers.inspect(debug, 'error-stream'))
+  .doto(helpers.inspect(debug, 'error-stream'))
   .resume()

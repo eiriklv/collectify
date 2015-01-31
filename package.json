@@ -18,7 +18,7 @@
     "highland": "^2.3.0",
     "interprocess-push-stream": "git://github.com/eiriklv/interprocess-push-stream",
     "json-mapper": "git+https://github.com/eiriklv/json-mapper",
-    "lodash": "^2.4.1",
+    "lodash": "3.0.x",
     "mongoose": "3.8.x",
     "site-parser": "git+https://github.com/eiriklv/site-parser"
   },
