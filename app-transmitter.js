@@ -58,10 +58,9 @@ var siteParser = require('site-parser')({
 
 /**
  * Create some curryed
- * helper functions to
- *
- * - check if two objects are equal (primitives as well)
- * - pick properties from objects
+ * helper functions
+ * for convenience
+ * and readability
  */
 var wrap = hl.wrapCallback.bind(hl);
 var isEqual = hl.ncurry(2, _.isEqual);
@@ -69,8 +68,9 @@ var pick = hl.ncurry(2, hl.flip(_.pick));
 var has = hl.curry(hl.flip(_.has));
 var transformTo = hl.curry(obtr.transformTo);
 var transformToSync = hl.curry(obtr.transformToSync);
-var copyFromTo = hl.curry(obtr.copy);
+var copyToFrom = hl.curry(obtr.copyToFrom);
 var copy = hl.compose(hl.flip(hl.extend)({}));
+var clone = hl.compose(JSON.parse, JSON.stringify);
 var getContentFromURL = hl.ncurry(3, _.rearg(nodeRead, 1, 0, 2));
 var findOneEntry = hl.ncurry(4, _.rearg(models.Entry.findOne.bind(models.Entry), 2, 1, 0, 3));
 var createEntry = models.Entry.create.bind(models.Entry);
@@ -362,8 +362,8 @@ var updatedArticleStream = existingArticleStream
 var addedContentStream = updatedArticleStream
   .fork()
   .reject(has('content'))
-  .map(copyFromTo({
-    url: ['content']
+  .map(copyToFrom({
+    content: 'url'
   }))
   .map(wrap(
     transformTo({

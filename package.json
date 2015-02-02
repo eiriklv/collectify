@@ -20,6 +20,8 @@
     "json-mapper": "git+https://github.com/eiriklv/json-mapper",
     "lodash": "3.0.x",
     "mongoose": "3.8.x",
+    "node-read": "^0.1.6",
+    "object-transform": "git://github.com/eiriklv/object-transform",
     "site-parser": "git+https://github.com/eiriklv/site-parser"
   },
   "devDependencies": {}

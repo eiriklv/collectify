@@ -40,3 +40,4 @@ Thumbs.db
 # Custom
 #####################
 /node_modules
+*.sh

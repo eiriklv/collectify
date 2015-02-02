@@ -4,4 +4,4 @@ export DEBUG="*" \
 export NODE_ENV="development" \
 export MONGO_URL="mongodb://localhost/collectify" \
 
-node app-transmitter
+node app
