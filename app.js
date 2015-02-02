@@ -57,10 +57,9 @@ var siteParser = require('site-parser')({
 
 /**
  * Create some curryed
- * helper functions to
- *
- * - check if two objects are equal (primitives as well)
- * - pick properties from objects
+ * helper functions
+ * for convenience
+ * and readability
  */
 var wrap = hl.wrapCallback.bind(hl);
 var isEqual = hl.ncurry(2, _.isEqual);
@@ -142,8 +141,7 @@ var testSource = hl([templates]);
  */
 var sourceStream = realSource
   .ratelimit(1, 30000)
-  .compact()
-  .flatten()
+  .compact().flatten()
   .ratelimit(10, 1000)
   .errors(emit('error'))
 
@@ -164,8 +162,7 @@ var jsonStream = sourceStream
     isEqual('json'),
     hl.get('type')
   ))
-  .map(wrap(transformJSON))
-  .parallel(5)
+  .map(wrap(transformJSON)).parallel(5)
   .errors(emit('error'))
 
 /**
@@ -287,7 +284,7 @@ var existingArticleStream = articleStream
  */
 var savedArticleStream = newArticleStream
   .fork()
-  .map(wrap(createEntry)).parallel(100000)
+  .flatMap(wrap(createEntry))
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -317,7 +314,7 @@ var updatedArticleStream = existingArticleStream
     )
   ))
   .map(pick('guid'))
-  .map(wrap(findOneEntry({}, ''))).parallel(100000)
+  .flatMap(wrap(findOneEntry({}, '')))
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -355,7 +352,7 @@ var addedContentStream = updatedArticleStream
     )
   ))
   .map(pick('guid'))
-  .map(wrap(findOneEntry({}, ''))).parallel(100000)
+  .flatMap(wrap(findOneEntry({}, '')))
   .invoke('toObject')
   .errors(emit('error'))
 
