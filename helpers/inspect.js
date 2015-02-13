@@ -1,4 +1,6 @@
-var util = require('util');
+'use strict';
+
+const util = require('util');
 
 exports = module.exports = function(logger, name) {
   return function(value) {

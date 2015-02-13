@@ -1,5 +1,7 @@
+'use strict';
+
 exports = module.exports = function(mongoose) {
-  var sourceSchema = new mongoose.Schema({
+  const sourceSchema = new mongoose.Schema({
     active: {
       type: Boolean,
       default: false

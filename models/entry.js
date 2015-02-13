@@ -1,5 +1,7 @@
+'use strict';
+
 exports = module.exports = function(mongoose) {
-  var entrySchema = new mongoose.Schema({
+  const entrySchema = new mongoose.Schema({
     _ranking: {
       type: Number,
       required: true,

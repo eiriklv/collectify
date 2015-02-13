@@ -1,6 +1,8 @@
-var util = require('util');
-var convict = require('convict');
-var debug = require('debug')('collectify:config');
+'use strict';
+
+const util = require('util');
+const convict = require('convict');
+const debug = require('debug')('collectify:config');
 
 process.on('uncaughtException', function(err) {
   debug('Caught exception without specific handler: ' + util.inspect(err));
@@ -8,7 +10,7 @@ process.on('uncaughtException', function(err) {
   process.exit(1);
 });
 
-var config = module.exports = convict({
+const config = module.exports = convict({
   env: {
     doc: 'The application environment.',
     format: ['production', 'development'],

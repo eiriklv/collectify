@@ -1,4 +1,6 @@
-var debug = require('debug')('collectify:setup');
+'use strict';
+
+const debug = require('debug')('collectify:setup');
 
 module.exports.connectToDatabase = function(mongoose, url) {
   mongoose.connection.on('open', function(ref) {

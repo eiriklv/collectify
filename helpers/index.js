@@ -1,3 +1,5 @@
+'use strict';
+
 exports = module.exports = {
   sourceWrapper: require('./source-wrapper'),
   handleErrors: require('./handle-errors'),
