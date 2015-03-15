@@ -1,21 +1,33 @@
 'use strict';
 
+/**
+ * Dependencies
+ */
 const debug = require('debug')('collectify:main-app');
 const http = require('http');
 const hl = require('highland');
-const _ = require('lodash');
+const _ = require('lodash-fp');
 const async = require('async');
 const util = require('util');
 const asyncify = require('asfy');
 const EventEmitter = require('events').EventEmitter;
 const mongoose = require('mongoose');
-const helpers = require('./helpers');
-const config = require('./config');
-const setup = require('./setup');
-const models = require('./models')(mongoose);
 const InterprocessPush = require('interprocess-push-stream');
 const nodeRead = require('node-read');
 const obtr = require('fp-object-transform');
+
+/**
+ * Application-specific modules
+ */
+const helpers = require('./helpers');
+const config = require('./config');
+const setup = require('./setup');
+
+/**
+ * Models
+ */
+const Entries = require('./models/entry');
+const Sources = require('./models/source');
 
 /**
  * Create an http agent
@@ -65,20 +77,18 @@ const siteParser = require('site-parser')({
  * and readability
  */
 const wrap = hl.wrapCallback.bind(hl);
-const isEqual = hl.ncurry(2, _.isEqual);
-const pick = hl.ncurry(2, hl.flip(_.pick));
-const has = hl.curry(hl.flip(_.has));
-const transformTo = hl.curry(obtr.transformTo);
-const transformToSync = hl.curry(obtr.transformToSync);
-const copyToFrom = hl.curry(obtr.copyToFrom);
+const transformTo = _.curry(obtr.transformTo);
+const transformToSync = _.curry(obtr.transformToSync);
+const copyToFrom = _.curry(obtr.copyToFrom);
 const copy = hl.compose(hl.flip(hl.extend)({}));
 const clone = hl.compose(JSON.parse, JSON.stringify);
-const getContentFromURL = hl.ncurry(3, _.rearg(nodeRead, 1, 0, 2));
-const findOneEntry = hl.ncurry(4, _.rearg(models.Entry.findOne.bind(models.Entry), 2, 1, 0, 3));
-const createEntry = models.Entry.create.bind(models.Entry);
-const countEntries = models.Entry.count.bind(models.Entry);
-const updateEntry = models.Entry.update.bind(models.Entry);
-const findSources = hl.ncurry(4, _.rearg(models.Source.find.bind(models.Source), 2, 1, 0, 3));
+const getContentFromURL = _.curryN(3, _.rearg([1, 0, 2], nodeRead));
+const findOneEntry = _.curryN(4, _.rearg([2, 1, 0, 3], Entries.findOne.bind(Entries)));
+const createEntry = Entries.create.bind(Entries);
+const countEntries = Entries.count.bind(Entries);
+const updateEntry = Entries.update.bind(Entries);
+const formatEntryForUpdate = Entries.formatForUpdate.bind(Entries)
+const findSources = _.curryN(4, _.rearg([2, 1, 0, 3], Sources.find.bind(Sources)));
 const transformHTML = siteParser.parse.bind(siteParser);
 const transformRSS = feedMapper.parse.bind(feedMapper);
 const transformJSON = jsonMapper.parse.bind(jsonMapper);
@@ -124,7 +134,7 @@ const errorChannel = InterprocessPush.Transmitter({
  * application
  */
 const eventEmitter = new EventEmitter();
-const emit = hl.ncurry(2, eventEmitter.emit.bind(eventEmitter));
+const emit = _.curryN(2, eventEmitter.emit.bind(eventEmitter));
 
 /**
  * Create a stream
@@ -191,8 +201,8 @@ const sourceStream = realSource
 const jsonStream = sourceStream
   .fork()
   .filter(hl.compose(
-    isEqual('json'),
-    hl.get('type')
+    _.isEqual('json'),
+    _.result('type')
   ))
   .map(wrap(transformJSON)).parallel(5)
   .errors(emit('error'))
@@ -211,8 +221,8 @@ const jsonStream = sourceStream
 const rssStream = sourceStream
   .fork()
   .filter(hl.compose(
-    isEqual('feed'),
-    hl.get('type')
+    _.isEqual('feed'),
+    _.result('type')
   ))
   .map(wrap(transformRSS)).parallel(5)
   .errors(emit('error'))
@@ -232,8 +242,8 @@ const rssStream = sourceStream
 const siteStream = sourceStream
   .fork()
   .filter(hl.compose(
-    isEqual('site'),
-    hl.get('type')
+    _.isEqual('site'),
+    _.result('type')
   ))
   .map(wrap(transformHTML)).parallel(5)
   .errors(emit('error'))
@@ -278,7 +288,7 @@ const newArticleStream = articleStream
       asyncify(hl.not),
       asyncify(helpers.isTruthy),
       countEntries,
-      asyncify(pick('guid'))
+      asyncify(_.pick('guid'))
     )
   ))
   .errors(emit('error'))
@@ -300,7 +310,7 @@ const existingArticleStream = articleStream
     async.compose(
       asyncify(helpers.isTruthy),
       countEntries,
-      asyncify(pick('guid'))
+      asyncify(_.pick('guid'))
     )
   ))
   .errors(emit('error'))
@@ -342,10 +352,10 @@ const updatedArticleStream = existingArticleStream
     async.compose(
       asyncify(helpers.isTruthy),
       updateEntry,
-      helpers.formatForUpdate(['guid'])
+      formatEntryForUpdate(['guid'])
     )
   ))
-  .map(pick('guid'))
+  .map(_.pick('guid'))
   .flatMap(wrap(findOneEntry({}, '')))
   .invoke('toObject')
   .errors(emit('error'))
@@ -362,14 +372,14 @@ const updatedArticleStream = existingArticleStream
  */
 const addedContentStream = updatedArticleStream
   .fork()
-  .reject(has('content'))
+  .reject(_.has('content'))
   .map(copyToFrom({
     content: 'url'
   }))
   .map(wrap(
     transformTo({
       content: async.compose(
-        asyncify(hl.get('content')),
+        asyncify(_.result('content')),
         getContentFromURL({
           agent: httpAgent
         })
@@ -380,10 +390,10 @@ const addedContentStream = updatedArticleStream
     async.compose(
       asyncify(helpers.isTruthy),
       updateEntry,
-      helpers.formatForUpdate(['guid'])
+      formatEntryForUpdate(['guid'])
     )
   ))
-  .map(pick('guid'))
+  .map(_.pick('guid'))
   .flatMap(wrap(findOneEntry({}, '')))
   .invoke('toObject')
   .errors(emit('error'))

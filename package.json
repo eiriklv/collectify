@@ -18,13 +18,14 @@
     "convict": "0.6.x",
     "debug": "2.1.x",
     "feed-mapper": "git+https://github.com/eiriklv/feed-mapper",
+    "fp-object-transform": "2.1.x",
     "highland": "2.3.x",
     "interprocess-push-stream": "git://github.com/eiriklv/interprocess-push-stream",
     "json-mapper": "git+https://github.com/eiriklv/json-mapper",
     "lodash": "3.2.x",
+    "lodash-fp": "^0.5.1",
     "mongoose": "3.8.x",
     "node-read": "0.1.x",
-    "fp-object-transform": "2.1.x",
     "site-parser": "git+https://github.com/eiriklv/site-parser"
   },
   "devDependencies": {}

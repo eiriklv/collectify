@@ -1,76 +1,84 @@
 'use strict';
 
-exports = module.exports = function(mongoose) {
-  const entrySchema = new mongoose.Schema({
-    _ranking: {
-      type: Number,
-      required: true,
-      index: true
-    },
-    _source: {
-      type: String,
-      required: true,
-      index: true
-    },
-    _origin: {
-      type: String,
-      required: true
-    },
-    _host: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    guid: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true
-    },
-    url: {
-      type: String,
-      required: true,
-      index: true
-    },
-    title: {
-      type: String,
-      required: true
-    },
-    image: {
-      type: String
-    },
-    content: {
-      type: String
-    },
-    posted: {
-      type: Date,
-      default: Date.now,
-      required: true
-    },
-    createdAt: {
-      type: Date,
-      default: Date.now,
-      expires: 86400, // ttl in seconds
-      required: true
-    }
-  });
+const mongoose = require('mongoose');
+const _ = require('lodash-fp');
+const asap = require('asap');
 
-  entrySchema.set('toObject', {
-    transform: function(doc, ret, options) {
-      // delete ret._id;
-      delete ret.__v;
-      // delete ret.createdAt; enable this if you do not want to update the expiry
-    }
-  });
+const schema = new mongoose.Schema({
+  _ranking: {
+    type: Number,
+    required: true,
+    index: true
+  },
+  _source: {
+    type: String,
+    required: true,
+    index: true
+  },
+  _origin: {
+    type: String,
+    required: true
+  },
+  _host: {
+    type: String,
+    required: true,
+    index: true,
+  },
+  guid: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true
+  },
+  url: {
+    type: String,
+    required: true,
+    index: true
+  },
+  title: {
+    type: String,
+    required: true
+  },
+  image: {
+    type: String
+  },
+  content: {
+    type: String
+  },
+  posted: {
+    type: Date,
+    default: Date.now,
+    required: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+    expires: 86400, // ttl in seconds
+    required: true
+  }
+});
 
-  entrySchema.set('toJSON', {
-    transform: function(doc, ret, options) {
-      // delete ret._id;
-      delete ret.__v;
-      // delete ret.createdAt; enable this if you do not want to update the expiry
-    }
-  });
+schema.set('toObject', {
+  transform: function(doc, ret, options) {
+    // delete ret._id;
+    delete ret.__v;
+    // delete ret.createdAt; enable this if you do not want to update the expiry
+  }
+});
 
-  // create the model for articles and return it
-  return mongoose.model('entry', entrySchema);
+schema.set('toJSON', {
+  transform: function(doc, ret, options) {
+    // delete ret._id;
+    delete ret.__v;
+    // delete ret.createdAt; enable this if you do not want to update the expiry
+  }
+});
+
+schema.statics.formatForUpdate = function(picks) {
+  return function(obj, callback) {
+    asap(callback.bind(this, null, _.pick(picks, obj), obj))
+  };
 };
+
+// create the model for articles and return it
+module.exports = mongoose.model('entry', schema);

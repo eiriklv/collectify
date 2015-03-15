@@ -1,18 +1,22 @@
 'use strict';
 
+/**
+ * Dependencies
+ */
 const debug = require('debug')('collectify:main-app');
-const http = require('http');
 const hl = require('highland');
-const _ = require('lodash');
+const _ = require('lodash-fp');
 const async = require('async');
-const util = require('util');
 const asyncify = require('asfy');
 const EventEmitter = require('events').EventEmitter;
-const mongoose = require('mongoose');
-const helpers = require('./helpers');
-const config = require('./config');
 const InterprocessPush = require('interprocess-push-stream');
 const obtr = require('fp-object-transform');
+
+/**
+ * Application-specific modules
+ */
+const helpers = require('./helpers');
+const config = require('./config');
 
 /**
  * Create some curryed
@@ -21,12 +25,9 @@ const obtr = require('fp-object-transform');
  * and readability
  */
 const wrap = hl.wrapCallback.bind(hl);
-const isEqual = hl.ncurry(2, _.isEqual);
-const pick = hl.ncurry(2, hl.flip(_.pick));
-const has = hl.curry(hl.flip(_.has));
-const transformTo = hl.curry(obtr.transformTo);
-const transformToSync = hl.curry(obtr.transformToSync);
-const copyToFrom = hl.curry(obtr.copyToFrom);
+const transformTo = _.curry(obtr.transformTo);
+const transformToSync = _.curry(obtr.transformToSync);
+const copyToFrom = _.curry(obtr.copyToFrom);
 const copy = hl.compose(hl.flip(hl.extend)({}));
 const clone = hl.compose(JSON.parse, JSON.stringify);
 
@@ -65,7 +66,7 @@ const errorChannel = InterprocessPush.Transmitter({
  * application
  */
 const eventEmitter = new EventEmitter();
-const emit = hl.ncurry(2, eventEmitter.emit.bind(eventEmitter));
+const emit = _.curryN(2, eventEmitter.emit.bind(eventEmitter));
 
 /**
  * Create a stream

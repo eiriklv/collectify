@@ -6,5 +6,5 @@ exports = module.exports = {
   isTruthy: require('./is-truthy'),
   sideEffect: require('./side-effect'),
   inspect: require('./inspect'),
-  formatForUpdate: require('./format-for-updating')
+  formatForUpdate: require('./format-for-update')
 };
