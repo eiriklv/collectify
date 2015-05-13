@@ -45,6 +45,12 @@ const schema = new mongoose.Schema({
   content: {
     type: String
   },
+  keywords: {
+    type: [String]
+  },
+  shares: {
+    type: mongoose.Schema.Types.Mixed
+  },
   posted: {
     type: Date,
     default: Date.now,

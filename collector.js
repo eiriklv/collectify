@@ -69,6 +69,10 @@ const siteParser = require('site-parser')({
   timeOut: 10000
 });
 
+const socialData = require('social-data')({
+  agent: (new http.Agent())
+});
+
 /**
  * Create some curryed
  * helper functions
@@ -76,6 +80,8 @@ const siteParser = require('site-parser')({
  * and readability
  */
 const wrap = hl.wrapCallback.bind(hl);
+const deriveTo = _.curry(obtr.deriveTo);
+const deriveToSync = _.curry(obtr.deriveToSync);
 const transformTo = _.curry(obtr.transformTo);
 const transformToSync = _.curry(obtr.transformToSync);
 const copyToFrom = _.curry(obtr.copyToFrom);
@@ -91,6 +97,7 @@ const findSources = _.curryN(4, _.rearg([2, 1, 0, 3], Sources.find.bind(Sources)
 const transformHTML = siteParser.parse.bind(siteParser);
 const transformRSS = feedMapper.parse.bind(feedMapper);
 const transformJSON = jsonMapper.parse.bind(jsonMapper);
+const getKeywordsFromString = helpers.getKeywordsFromString;
 
 /**
  * Create a new event-emitter
@@ -304,7 +311,10 @@ const savedArticleStream = newArticleStream
  * Create a stream that
  * forks the existingArticleStream
  * and updates all the entries
- * in the database with a new timestamp
+ * in the database with
+ * 
+ * - an updated timestamp
+ * - social shares data
  *
  * The result is the data
  * passed back from mongoose
@@ -312,12 +322,18 @@ const savedArticleStream = newArticleStream
 const updatedArticleStream = existingArticleStream
   .fork()
   .map(copy)
-  .map(hl.extend({
-    createdAt: 0
+  .map(deriveToSync({
+    createdAt: [null, Date.now]
   }))
-  .map(transformToSync({
-    createdAt: Date.now
-  }))
+  .map(wrap(
+    deriveTo({
+      shares: {
+        facebook: ['url', socialData.facebook],
+        twitter: ['url', socialData.twitter],
+        linkedin: ['url', socialData.linkedin]
+      }
+    })
+  )).parallel(10)
   .flatFilter(wrap(
     async.compose(
       asyncify(helpers.isTruthy),
@@ -334,28 +350,33 @@ const updatedArticleStream = existingArticleStream
  * Create a stream that
  * forks the updatedArticleStream
  * and updates all the entries
- * in the database with article / website content,
- * if it does not already have it
+ * in the database with
+ * 
+ * - article / website content
+ * - keywords based on the content
+ * 
+ * (if it does not have it already)
  *
  * The result is the data
  * passed back from mongoose
+ * after updating
  */
 const addedContentStream = updatedArticleStream
   .fork()
   .reject(_.has('content'))
-  .map(copyToFrom({
-    content: 'url'
-  }))
   .map(wrap(
-    transformTo({
-      content: async.compose(
+    deriveTo({
+      content: ['url', async.compose(
         asyncify(_.result('content')),
         getContentFromURL({
           agent: httpAgent
         })
-      )
+      )]
     })
-  )).parallel(50)
+  )).parallel(10)
+  .map(deriveToSync({
+    keywords: ['content', getKeywordsFromString]
+  }))
   .flatFilter(wrap(
     async.compose(
       asyncify(helpers.isTruthy),
