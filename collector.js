@@ -30,6 +30,18 @@ const Entries = require('./models/entry');
 const Sources = require('./models/source');
 
 /**
+ * Create a custom http agent
+ * and a corresponding
+ * options object
+ */
+const httpAgent = new http.Agent();
+httpAgent.maxSockets = 50;
+
+const agentOpts = {
+  agent: httpAgent
+};
+
+/**
  * Create streams for the channels
  * on which we want to
  * distribute / emit data.
@@ -68,18 +80,10 @@ const errorChannel = interprocess.Transmitter({
  * - map from templates to arrays of articles
  * - map from url to social shares data
  */
-const httpAgent = new http.Agent();
-httpAgent.maxSockets = 50;
-
-const mapperOpts = {
-  timeOut: 10000,
-  agent: httpAgent
-};
-
-const jsonMapper = require('json-mapper')(mapperOpts);
-const feedMapper = require('feed-mapper')(mapperOpts);
-const siteParser = require('site-parser')(mapperOpts);
-const socialData = require('social-data')(mapperOpts);
+const jsonMapper = require('json-mapper')({ timeOut: 10000 });
+const feedMapper = require('feed-mapper')({ timeOut: 10000 });
+const siteParser = require('site-parser')({ timeOut: 10000 });
+const socialData = require('social-data')(agentOpts);
 
 /**
  * Create some curryed
