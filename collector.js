@@ -14,7 +14,7 @@ const EventEmitter = require('events').EventEmitter;
 const mongoose = require('mongoose');
 const nodeRead = require('node-read');
 const obtr = require('fp-object-transform');
-const InterprocessPush = require('interprocess-push-stream');
+const { Transmitter } = require('interprocess-push-stream');
 
 /**
  * Application-specific modules
@@ -30,14 +30,6 @@ const Entries = require('./models/entry');
 const Sources = require('./models/source');
 
 /**
- * Create an http agent
- * to set the max
- * amount of open sockets
- */
-const httpAgent = new http.Agent();
-httpAgent.maxSockets = 50;
-
-/**
  * Create streams for the channels
  * on which we want to
  * distribute / emit data.
@@ -49,19 +41,19 @@ httpAgent.maxSockets = 50;
  * and back-pressure between
  * processes
  */
-const updatedChannel = InterprocessPush.Transmitter({
+const updatedChannel = Transmitter({
   channel: 'articles:updated',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const createdChannel = InterprocessPush.Transmitter({
+const createdChannel = Transmitter({
   channel: 'articles:created',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const errorChannel = InterprocessPush.Transmitter({
+const errorChannel = Transmitter({
   channel: 'errors',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
@@ -76,10 +68,18 @@ const errorChannel = InterprocessPush.Transmitter({
  * - map from templates to arrays of articles
  * - map from url to social shares data
  */
-const jsonMapper = require('json-mapper')({ timeOut: 10000 });
-const feedMapper = require('feed-mapper')({ timeOut: 10000 });
-const siteParser = require('site-parser')({ timeOut: 10000 });
-const socialData = require('social-data')({ agent: httpAgent });
+const httpAgent = new http.Agent();
+httpAgent.maxSockets = 50;
+
+const mapperOpts = {
+  timeOut: 10000,
+  agent: httpAgent
+};
+
+const jsonMapper = require('json-mapper')(mapperOpts);
+const feedMapper = require('feed-mapper')(mapperOpts);
+const siteParser = require('site-parser')(mapperOpts);
+const socialData = require('social-data')(mapperOpts);
 
 /**
  * Create some curryed
@@ -95,7 +95,7 @@ const transformToSync = lodash.curry(obtr.transformToSync);
 const copyToFrom = lodash.curry(obtr.copyToFrom);
 const copy = lodash.compose(highland.flip(highland.extend)({}));
 const clone = lodash.compose(JSON.parse, JSON.stringify);
-const getContentFromURL = lodash.curryN(3, lodash.rearg([1, 0, 2], nodeRead))({ agent: httpAgent });
+const getContentFromURL = lodash.curryN(3, lodash.rearg([1, 0, 2], nodeRead))(agentOpts);
 const findOneEntry = lodash.curryN(4, lodash.rearg([2, 1, 0, 3], Entries.findOne.bind(Entries)));
 const createEntry = Entries.create.bind(Entries);
 const countEntries = Entries.count.bind(Entries);

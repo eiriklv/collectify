@@ -4,34 +4,18 @@
  * Dependencies
  */
 const http = require('http');
-const debug = require('debug')('collectify:main-app');
+const debug = require('debug')('collectify:websocket-api');
 const highland = require('highland');
 const lodash = require('lodash-fp');
-const async = require('async');
-const asyncify = require('asfy');
 const EventEmitter = require('events').EventEmitter;
-const InterprocessPush = require('interprocess-push-stream');
-const obtr = require('fp-object-transform');
-const websocket = require('websocket-stream')
+const websocket = require('websocket-stream');
+const { Transmitter, Receiver } = require('interprocess-push-stream');
 
 /**
  * Application-specific modules
  */
 const helpers = require('./helpers');
 const config = require('./config');
-
-/**
- * Create some curryed
- * helper functions
- * for convenience
- * and readability
- */
-const wrap = highland.wrapCallback.bind(highland);
-const transformTo = lodash.curry(obtr.transformTo);
-const transformToSync = lodash.curry(obtr.transformToSync);
-const copyToFrom = lodash.curry(obtr.copyToFrom);
-const copy = highland.compose(highland.flip(highland.extend)({}));
-const clone = highland.compose(JSON.parse, JSON.stringify);
 
 /**
  * Create streams for the channels
@@ -45,13 +29,13 @@ const clone = highland.compose(JSON.parse, JSON.stringify);
  * and back-pressure between
  * processes
  */
-const createdChannel = InterprocessPush.Receiver({
+const createdChannel = Receiver({
   channel: 'articles:created',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const errorChannel = InterprocessPush.Transmitter({
+const errorChannel = Transmitter({
   channel: 'errors',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
@@ -114,7 +98,7 @@ errorStream
  * which we'll use to
  * attach a websocket server
  */
-const server = http.createServer()
+const httpServer = http.createServer()
 
 /**
  * Create a websocket server
@@ -124,7 +108,7 @@ const server = http.createServer()
  * (We also kill the stream when the client ends)
  */
 const wss = websocket.createServer({
-  server: server
+  server: httpServer
 }, function(stream) {
   let contentStream = createdArticles
     .observe()

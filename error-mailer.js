@@ -3,10 +3,10 @@
 /**
  * Dependencies
  */
-const debug = require('debug')('collectify:main-app');
+const debug = require('debug')('collectify:error-mailer');
 const highland = require('highland');
 const lodash = require('lodash-fp');
-const InterprocessPush = require('interprocess-push-stream');
+const { Receiver } = require('interprocess-push-stream');
 
 /**
  * Application-specific modules
@@ -34,7 +34,7 @@ const wrap = highland.wrapCallback.bind(highland);
  * and back-pressure between
  * processes
  */
-const errorChannel = InterprocessPush.Receiver({
+const errorChannel = Receiver({
   channel: 'errors',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
@@ -52,6 +52,10 @@ const errorMessageStream = highland(createdChannel)
     console.log(err);
   })
 
+/**
+ * Do stuff with the
+ * stream of error messages
+ */
 errorMessageStream
   .fork()
   .each(highland.log)
