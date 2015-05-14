@@ -3,14 +3,16 @@
 /**
  * Dependencies
  */
+const http = require('http');
 const debug = require('debug')('collectify:main-app');
-const hl = require('highland');
-const _ = require('lodash-fp');
+const highland = require('highland');
+const lodash = require('lodash-fp');
 const async = require('async');
 const asyncify = require('asfy');
 const EventEmitter = require('events').EventEmitter;
 const InterprocessPush = require('interprocess-push-stream');
 const obtr = require('fp-object-transform');
+const websocket = require('websocket-stream')
 
 /**
  * Application-specific modules
@@ -24,12 +26,12 @@ const config = require('./config');
  * for convenience
  * and readability
  */
-const wrap = hl.wrapCallback.bind(hl);
-const transformTo = _.curry(obtr.transformTo);
-const transformToSync = _.curry(obtr.transformToSync);
-const copyToFrom = _.curry(obtr.copyToFrom);
-const copy = hl.compose(hl.flip(hl.extend)({}));
-const clone = hl.compose(JSON.parse, JSON.stringify);
+const wrap = highland.wrapCallback.bind(highland);
+const transformTo = lodash.curry(obtr.transformTo);
+const transformToSync = lodash.curry(obtr.transformToSync);
+const copyToFrom = lodash.curry(obtr.copyToFrom);
+const copy = highland.compose(highland.flip(highland.extend)({}));
+const clone = highland.compose(JSON.parse, JSON.stringify);
 
 /**
  * Create streams for the channels
@@ -43,14 +45,14 @@ const clone = hl.compose(JSON.parse, JSON.stringify);
  * and back-pressure between
  * processes
  */
-const newChannel = InterprocessPush.Receiver({
-  channel: 'articles:new',
+const createdChannel = InterprocessPush.Receiver({
+  channel: 'articles:created',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
 const errorChannel = InterprocessPush.Transmitter({
-  channel: 'error',
+  channel: 'errors',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
@@ -66,7 +68,7 @@ const errorChannel = InterprocessPush.Transmitter({
  * application
  */
 const eventEmitter = new EventEmitter();
-const emit = _.curryN(2, eventEmitter.emit.bind(eventEmitter));
+const emit = lodash.curryN(2, eventEmitter.emit.bind(eventEmitter));
 
 /**
  * Create a stream
@@ -76,14 +78,14 @@ const emit = _.curryN(2, eventEmitter.emit.bind(eventEmitter));
  * throughout the
  * the stream pipeline(s)
  */
-const errorStream = hl('error', eventEmitter);
+const errorStream = highland('error', eventEmitter);
 
 /**
  * Create a stream
  * with the newChannel
  * as the source
  */
-const newArticles = hl(newChannel)
+const createdArticles = highland(createdChannel)
   .compact()
   .flatten()
   .errors(emit('error'))
@@ -94,7 +96,7 @@ const newArticles = hl(newChannel)
  * resulting entries in
  * mongodb
  */
-newArticles
+createdArticles
   .fork()
   .doto(helpers.inspect(debug, 'publish-live'))
   .resume()
@@ -106,3 +108,34 @@ newArticles
 errorStream
   .doto(helpers.inspect(debug, 'error-stream'))
   .pipe(errorChannel)
+
+/**
+ * Create an http server
+ * which we'll use to
+ * attach a websocket server
+ */
+const server = http.createServer()
+
+/**
+ * Create a websocket server
+ * where we 'plug' our content
+ * stream into the websocket
+ *
+ * (We also kill the stream when the client ends)
+ */
+const wss = websocket.createServer({
+  server: server
+}, function(stream) {
+  let contentStream = createdArticles
+    .observe()
+    .map(JSON.stringify)
+    .doto(highland.log)
+  
+  contentStream.pipe(stream)
+
+  stream.once('close', function() {
+    contentStream.destroy();
+  });
+});
+
+server.listen(3333);

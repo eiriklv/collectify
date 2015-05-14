@@ -28,7 +28,8 @@
     "mongoose": "3.8.24",
     "node-read": "0.1.x",
     "site-parser": "git+https://github.com/eiriklv/site-parser",
-    "social-data": "^1.0.0"
+    "social-data": "^1.0.0",
+    "websocket-stream": "^1.5.0"
   },
   "devDependencies": {}
 }

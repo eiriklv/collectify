@@ -28,19 +28,6 @@ export REDIS_PREFIX='collectify'
 iojs collector
 ```
 
-#### Development shellscript example for `collector-transmitter` (collecting, saving and publishing on redis):
-```sh
-#!/bin/sh
-
-export DEBUG="*" \
-export NODE_ENV="development" \
-export MONGO_URL="mongodb://localhost/collectify" \
-export REDIS_URL='redis://localhost:6379' \
-export REDIS_PREFIX='collectify'
-
-iojs collector-transmitter
-```
-
 #### Development shellscript example for `publisher`:
 ```sh
 #!/bin/sh
