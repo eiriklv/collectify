@@ -9,7 +9,7 @@ const highland = require('highland');
 const lodash = require('lodash-fp');
 const EventEmitter = require('events').EventEmitter;
 const websocket = require('websocket-stream');
-const { Transmitter, Receiver } = require('interprocess-push-stream');
+const interprocess = require('interprocess-push-stream');
 
 /**
  * Application-specific modules
@@ -29,13 +29,13 @@ const config = require('./config');
  * and back-pressure between
  * processes
  */
-const createdChannel = Receiver({
+const createdChannel = interprocess.Receiver({
   channel: 'articles:created',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const errorChannel = Transmitter({
+const errorChannel = interprocess.Transmitter({
   channel: 'errors',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
@@ -103,7 +103,7 @@ const httpServer = http.createServer()
 /**
  * Create a websocket server
  * where we 'plug' our content
- * stream into the websocket
+ * stream into the websocket(s)
  *
  * (We also kill the stream when the client ends)
  */

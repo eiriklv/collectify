@@ -6,7 +6,7 @@
 const debug = require('debug')('collectify:error-mailer');
 const highland = require('highland');
 const lodash = require('lodash-fp');
-const { Receiver } = require('interprocess-push-stream');
+const interprocess = require('interprocess-push-stream');
 
 /**
  * Application-specific modules
@@ -34,7 +34,7 @@ const wrap = highland.wrapCallback.bind(highland);
  * and back-pressure between
  * processes
  */
-const errorChannel = Receiver({
+const errorChannel = interprocess.Receiver({
   channel: 'errors',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')

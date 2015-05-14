@@ -14,7 +14,7 @@ const EventEmitter = require('events').EventEmitter;
 const mongoose = require('mongoose');
 const nodeRead = require('node-read');
 const obtr = require('fp-object-transform');
-const { Transmitter } = require('interprocess-push-stream');
+const interprocess = require('interprocess-push-stream');
 
 /**
  * Application-specific modules
@@ -41,19 +41,19 @@ const Sources = require('./models/source');
  * and back-pressure between
  * processes
  */
-const updatedChannel = Transmitter({
+const updatedChannel = interprocess.Transmitter({
   channel: 'articles:updated',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const createdChannel = Transmitter({
+const createdChannel = interprocess.Transmitter({
   channel: 'articles:created',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const errorChannel = Transmitter({
+const errorChannel = interprocess.Transmitter({
   channel: 'errors',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
