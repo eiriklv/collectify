@@ -14,6 +14,7 @@ const EventEmitter = require('events').EventEmitter;
 const mongoose = require('mongoose');
 const nodeRead = require('node-read');
 const obtr = require('fp-object-transform');
+const InterprocessPush = require('interprocess-push-stream');
 
 /**
  * Application-specific modules
@@ -37,6 +38,36 @@ const httpAgent = new http.Agent();
 httpAgent.maxSockets = 50;
 
 /**
+ * Create streams for the channels
+ * on which we want to
+ * distribute / emit data.
+ *
+ * This uses the push-version
+ * of the interface, but you
+ * could also use the pull-version,
+ * to enable load balancing
+ * and back-pressure between
+ * processes
+ */
+const updatedChannel = InterprocessPush.Transmitter({
+  channel: 'articles:updated',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
+
+const newChannel = InterprocessPush.Transmitter({
+  channel: 'articles:new',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
+
+const errorChannel = InterprocessPush.Transmitter({
+  channel: 'error',
+  prefix: config.get('database.redis.prefix'),
+  url: config.get('database.redis.url')
+});
+
+/**
  * Test templates
  * if we need to
  * do some testing
@@ -54,8 +85,11 @@ const templates = require('./templates');
  * Create instances of our
  * mappers/parsers.
  *
- * Here we are going to map from
- * templates to arrays of articles.
+ * Here we are going to
+ * 
+ * - map from templates to arrays of articles
+ * - map from url to social shares data
+ * 
  */
 const jsonMapper = require('json-mapper')({
   timeOut: 10000
@@ -70,7 +104,7 @@ const siteParser = require('site-parser')({
 });
 
 const socialData = require('social-data')({
-  agent: (new http.Agent())
+  agent: httpAgent
 });
 
 /**
@@ -120,7 +154,7 @@ const emit = _.curryN(2, eventEmitter.emit.bind(eventEmitter));
  * throughout the
  * the stream pipeline(s)
  */
-const errorStream = hl('error', eventEmitter);
+const errorStream = hl('err', eventEmitter);
 
 /**
  * Create a partially applied
@@ -158,11 +192,11 @@ const testSource = hl([templates]);
  * - limit the rate to 10 templates / 1 seconds
  * - emit all errors via the event-emitter
  */
-const sourceStream = realSource
+const sourceStream = testSource
   .ratelimit(1, 30000)
   .compact().flatten()
   .ratelimit(10, 1000)
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Create a stream that
@@ -182,7 +216,7 @@ const jsonStream = sourceStream
     _.result('type')
   ))
   .map(wrap(transformJSON)).parallel(5)
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Create a stream that
@@ -202,7 +236,7 @@ const rssStream = sourceStream
     _.result('type')
   ))
   .map(wrap(transformRSS)).parallel(5)
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 
 /**
@@ -223,7 +257,7 @@ const siteStream = sourceStream
     _.result('type')
   ))
   .map(wrap(transformHTML)).parallel(5)
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Create a stream that merges
@@ -245,7 +279,8 @@ const articleStream = hl([
   ])
   .merge()
   .flatten()
-  .errors(emit('error'))
+  .compact()
+  .errors(emit('err'))
 
 /**
  * Create a stream that
@@ -268,7 +303,7 @@ const newArticleStream = articleStream
       asyncify(_.pick('guid'))
     )
   ))
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Create a stream that
@@ -290,7 +325,7 @@ const existingArticleStream = articleStream
       asyncify(_.pick('guid'))
     )
   ))
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Create a stream that
@@ -305,7 +340,7 @@ const savedArticleStream = newArticleStream
   .fork()
   .flatMap(wrap(createEntry))
   .invoke('toObject')
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Create a stream that
@@ -344,7 +379,7 @@ const updatedArticleStream = existingArticleStream
   .map(_.pick('guid'))
   .flatMap(wrap(findOneEntry({}, '')))
   .invoke('toObject')
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Create a stream that
@@ -387,7 +422,7 @@ const addedContentStream = updatedArticleStream
   .map(_.pick('guid'))
   .flatMap(wrap(findOneEntry({}, '')))
   .invoke('toObject')
-  .errors(emit('error'))
+  .errors(emit('err'))
 
 /**
  * Connect to the database
@@ -405,7 +440,7 @@ setup.connectToDatabase(
 newArticleStream
   .fork()
   .doto(helpers.inspect(debug, 'new-stream'))
-  .resume()
+  .pipe(newChannel)
 
 /**
  * Pipe all new articles to
@@ -437,7 +472,7 @@ savedArticleStream
 updatedArticleStream
   .fork()
   .doto(helpers.inspect(debug, 'updated-stream'))
-  .resume()
+  .pipe(updatedChannel)
 
 /**
  * Log all articles

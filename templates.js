@@ -1,8 +1,8 @@
 exports = module.exports = [{
   "active": true,
   "type": "feed",
-  "name": "TheWireCutter",
-  "url": "http://feeds.feedburner.com/TheWirecutter",
+  "name": "TechCrunch",
+  "url": "http://feeds.feedburner.com/TechCrunch//",
   "template": {
     "elements": [{
       "name": "guid",
@@ -36,7 +36,7 @@ exports = module.exports = [{
       "items": [{
         "selector": "enclosures[0].url"
       }],
-      "fallback": "http://thewirecutter.wpengine.netdna-cdn.com/wp-content/themes/thewirecutter/thewirecutter/img/logo/header.png"
+      "fallback": "https://s0.wp.com/wp-content/themes/vip/techcrunch-2013/assets/images/logo.svg"
     }]
   }
 }, {

@@ -292,8 +292,14 @@ const articleStream = hl([
  * is that if we get a count === 0
  * for the 'guid' we define it
  * as new
+ *
+ * Save all the new entries
+ * in the database
+ *
+ * The result is the data
+ * passed back from mongoose
  */
-const newArticleStream = articleStream
+const savedArticleStream = articleStream
   .fork()
   .flatFilter(wrap(
     async.compose(
@@ -303,20 +309,31 @@ const newArticleStream = articleStream
       asyncify(_.pick('guid'))
     )
   ))
+  .flatMap(wrap(createEntry))
+  .invoke('toObject')
   .errors(emit('err'))
 
 /**
  * Create a stream that
  * filters the articleStream
  * and keeps only the articles
- * that already exist
+ * that already exist in the db
  *
  * - In this case our predicate
  * is that if we get a count > 0
  * for the 'guid' we define it
  * as existing
+ *
+ * We update all the existing
+ * entries with
+ *
+ * - an updated timestamp
+ * - social shares data
+ *
+ * The result is the data
+ * passed back from mongoose
  */
-const existingArticleStream = articleStream
+const updatedArticleStream = articleStream
   .fork()
   .flatFilter(wrap(
     async.compose(
@@ -325,37 +342,6 @@ const existingArticleStream = articleStream
       asyncify(_.pick('guid'))
     )
   ))
-  .errors(emit('err'))
-
-/**
- * Create a stream that
- * forks the newArticleStream
- * and saves all the entries
- * in the database
- *
- * The result is the data
- * passed back from mongoose
- */
-const savedArticleStream = newArticleStream
-  .fork()
-  .flatMap(wrap(createEntry))
-  .invoke('toObject')
-  .errors(emit('err'))
-
-/**
- * Create a stream that
- * forks the existingArticleStream
- * and updates all the entries
- * in the database with
- * 
- * - an updated timestamp
- * - social shares data
- *
- * The result is the data
- * passed back from mongoose
- */
-const updatedArticleStream = existingArticleStream
-  .fork()
   .map(copy)
   .map(deriveToSync({
     createdAt: [null, Date.now]
@@ -396,7 +382,7 @@ const updatedArticleStream = existingArticleStream
  * passed back from mongoose
  * after updating
  */
-const addedContentStream = updatedArticleStream
+const contentAddedStream = updatedArticleStream
   .fork()
   .reject(_.has('content'))
   .map(wrap(
@@ -433,26 +419,6 @@ setup.connectToDatabase(
 );
 
 /**
- * Pipe all new articles to
- * the channel defined
- * for new articles
- */
-newArticleStream
-  .fork()
-  .doto(helpers.inspect(debug, 'new-stream'))
-  .pipe(newChannel)
-
-/**
- * Pipe all new articles to
- * the channel defined
- * for existing articles
- */
-existingArticleStream
-  .fork()
-  .doto(helpers.inspect(debug, 'existing-stream'))
-  .resume()
-
-/**
  * Log all the saved
  * articles and the
  * resulting entries in
@@ -478,9 +444,9 @@ updatedArticleStream
  * Log all articles
  * updated with content
  */
-addedContentStream
+contentAddedStream
   .fork()
-  .doto(helpers.inspect(debug, 'content-stream'))
+  .doto(helpers.inspect(debug, 'content-added-stream'))
   .resume()
 
 /**
@@ -489,4 +455,4 @@ addedContentStream
  */
 errorStream
   .doto(helpers.inspect(debug, 'error-stream'))
-  .resume()
+  .pipe(errorChannel)
