@@ -3,7 +3,7 @@
 /**
  * Dependencies
  */
-const debug = require('debug')('collectify:error-mailer');
+const debug = require('debug')('collectify:error-processing');
 const highland = require('highland');
 const lodash = require('lodash-fp');
 const interprocess = require('interprocess-push-stream');
@@ -55,6 +55,9 @@ const errorMessageStream = highland(createdChannel)
 /**
  * Do stuff with the
  * stream of error messages
+ *
+ * - mail it to admin
+ * - log it
  */
 errorMessageStream
   .fork()

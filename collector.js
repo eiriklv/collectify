@@ -222,7 +222,8 @@ const testSource = highland([require('./templates')]);
  */
 const sourceStream = realSource
   .ratelimit(1, 30000)
-  .compact().flatten()
+  .compact()
+  .flatten()
   .ratelimit(10, 1000)
   .errors(emit('error'))
 
@@ -239,7 +240,7 @@ const sourceStream = realSource
  */
 const jsonStream = sourceStream
   .fork()
-  .filter(highland.compose(
+  .filter(lodash.compose(
     lodash.isEqual('json'),
     lodash.result('type')
   ))
@@ -259,7 +260,7 @@ const jsonStream = sourceStream
  */
 const rssStream = sourceStream
   .fork()
-  .filter(highland.compose(
+  .filter(lodash.compose(
     lodash.isEqual('feed'),
     lodash.result('type')
   ))
@@ -280,7 +281,7 @@ const rssStream = sourceStream
  */
 const siteStream = sourceStream
   .fork()
-  .filter(highland.compose(
+  .filter(lodash.compose(
     lodash.isEqual('site'),
     lodash.result('type')
   ))
