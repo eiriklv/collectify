@@ -31,7 +31,7 @@ A functional streaming news aggregator with real-time distribution. Mostly for e
 * Development: start either `collector` or/and `publisher` using the development scripts below
 * Production: set environment variables and start applicable scripts
 
-#### Development shellscript example for `collector` (collecting and saving):
+#### Development shellscript example for `collector`:
 ```sh
 #!/bin/sh
 
