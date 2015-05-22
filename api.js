@@ -38,7 +38,7 @@ setup.connectToDatabase(
  * a collection of articles
  */
 app.get('/articles', function(req, res) {
-  //...
+  //..TODO
 });
 
 /**
@@ -46,7 +46,7 @@ app.get('/articles', function(req, res) {
  * a specific article
  */
 app.get('/articles/:url', function(req, res) {
-  //...
+  //..TODO
 });
 
 /**

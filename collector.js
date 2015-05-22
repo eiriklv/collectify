@@ -26,7 +26,7 @@ const setup = require('./setup');
 /**
  * Data Models (mongoose)
  */
-const Entries = require('./models/entry');
+const Articles = require('./models/entry');
 const Sources = require('./models/source');
 
 /**
@@ -100,11 +100,11 @@ const copyToFrom = lodash.curry(obtr.copyToFrom);
 const copy = lodash.compose(highland.flip(highland.extend)({}));
 const clone = lodash.compose(JSON.parse, JSON.stringify);
 const getContentFromURL = lodash.curryN(3, lodash.rearg([1, 0, 2], nodeRead))(agentOpts);
-const findOneEntry = lodash.curryN(4, lodash.rearg([2, 1, 0, 3], Entries.findOne.bind(Entries)));
-const createEntry = Entries.create.bind(Entries);
-const countEntries = Entries.count.bind(Entries);
-const updateEntry = Entries.update.bind(Entries);
-const formatEntryForUpdate = Entries.formatForUpdate.bind(Entries);
+const findOneArticle = lodash.curryN(4, lodash.rearg([2, 1, 0, 3], Articles.findOne.bind(Articles)));
+const createArticle = Articles.create.bind(Articles);
+const countArticles = Articles.count.bind(Articles);
+const updateArticle = Articles.update.bind(Articles);
+const formatArticleForUpdate = Articles.formatForUpdate.bind(Articles);
 const findSources = lodash.curryN(4, lodash.rearg([2, 1, 0, 3], Sources.find.bind(Sources)));
 const transformHTML = siteParser.parse.bind(siteParser);
 const transformRSS = feedMapper.parse.bind(feedMapper);
@@ -117,7 +117,7 @@ const getKeywordsFromString = helpers.getKeywordsFromString;
  */
 const isExisting = async.compose(
   asyncify(helpers.isTruthy),
-  countEntries,
+  countArticles,
   asyncify(lodash.pick('guid'))
 );
 
@@ -136,8 +136,8 @@ const addSocialDataFromUrl = deriveTo({
 
 const updateInDatabase = async.compose(
   asyncify(helpers.isTruthy),
-  updateEntry,
-  formatEntryForUpdate(['guid'])
+  updateArticle,
+  formatArticleForUpdate(['guid'])
 );
 
 const addContentFromUrl = deriveTo({
@@ -331,7 +331,7 @@ const articleStream = highland([
 const createdArticleStream = articleStream
   .fork()
   .flatFilter(wrap(isNotExisting))
-  .flatMap(wrap(createEntry))
+  .flatMap(wrap(createArticle))
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -381,7 +381,7 @@ const updatedArticleStream = articleStream
 const contentAddedStream = updatedArticleStream
   .fork()
   .map(lodash.pick('guid'))
-  .flatMap(wrap(findOneEntry({}, '')))
+  .flatMap(wrap(findOneArticle({}, '')))
   .invoke('toObject')
   .reject(lodash.has('content'))
   .map(wrap(addContentFromUrl)).parallel(10)
