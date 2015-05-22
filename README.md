@@ -9,6 +9,9 @@ A functional streaming news aggregator with real-time distribution. Mostly for e
   * store and update articles in a mongodb collection
   * publish data to applicable channels/listeners
 
+* `api.js` will
+  * expose the data (articles) stored in the database as a HTTP API
+
 * `websocket-api.js` will
   * listen for data being piped into the _articles:created_ channel it listens to
   * expose that data real-time as a websocket api
