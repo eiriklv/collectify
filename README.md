@@ -30,9 +30,6 @@ A functional streaming news aggregator with real-time distribution. Mostly for e
 * `npm install -g gulp`
 * `npm install`
 
-#### Run the application:
-* Development: start either `collector` or/and `publisher` using the development scripts below
-* Production: set environment variables and start applicable scripts
 
 #### Development shellscript example for `collector`:
 ```sh
@@ -45,6 +42,17 @@ export REDIS_URL='redis://localhost:6379' \
 export REDIS_PREFIX='collectify'
 
 node collector
+```
+
+#### Development shellscript example for `api`:
+```sh
+#!/bin/sh
+
+export DEBUG="*" \
+export NODE_ENV="development" \
+export MONGO_URL="mongodb://localhost/collectify" \
+
+node api
 ```
 
 #### Development shellscript example for `websocket-api`:
