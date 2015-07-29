@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Dependencies
  */
@@ -15,7 +13,6 @@ const app = express();
 /**
  * Application-specific modules
  */
-const helpers = require('./helpers');
 const config = require('./config');
 const setup = require('./setup');
 
@@ -37,7 +34,7 @@ setup.connectToDatabase(
  * Route for fetching
  * a collection of articles
  */
-app.get('/articles', function(req, res) {
+app.get('/articles', (req, res) => {
   //..TODO
 });
 
@@ -45,7 +42,7 @@ app.get('/articles', function(req, res) {
  * Route for fetching
  * a specific article
  */
-app.get('/articles/:url', function(req, res) {
+app.get('/articles/:url', (req, res) => {
   //..TODO
 });
 

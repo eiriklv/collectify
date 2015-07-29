@@ -3,7 +3,7 @@ Collectify
 
 #### Introduction:
 A functional streaming news aggregator with real-time distribution. Mostly for educative purposes.
-(depends on `iojs` 1.x).
+(uses babel-node to support ES6+).
 
 * `collector.js` will
   * store and update articles in a mongodb collection
@@ -28,6 +28,7 @@ A functional streaming news aggregator with real-time distribution. Mostly for e
 * `brew/apt-get install redis`
 * `brew/apt-get install mongodb`
 * `npm install -g gulp`
+* `npm install -g babel`
 * `npm install`
 
 
@@ -41,7 +42,7 @@ export MONGO_URL="mongodb://localhost/collectify" \
 export REDIS_URL='redis://localhost:6379' \
 export REDIS_PREFIX='collectify'
 
-node collector
+babel-node collector
 ```
 
 #### Development shellscript example for `api`:
@@ -52,7 +53,7 @@ export DEBUG="*" \
 export NODE_ENV="development" \
 export MONGO_URL="mongodb://localhost/collectify" \
 
-node api
+babel-node api
 ```
 
 #### Development shellscript example for `websocket-api`:
@@ -64,7 +65,7 @@ export NODE_ENV="development" \
 export REDIS_URL='redis://localhost:6379' \
 export REDIS_PREFIX='collectify'
 
-node websocket-api
+babel-node websocket-api
 ```
 
 #### Development shellscript example for `error-processing`:
@@ -76,5 +77,5 @@ export NODE_ENV="development" \
 export REDIS_URL='redis://localhost:6379' \
 export REDIS_PREFIX='collectify'
 
-node error-processing
+babel-node error-processing
 ```

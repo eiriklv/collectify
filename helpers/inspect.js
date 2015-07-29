@@ -1,5 +1,3 @@
-'use strict';
-
 const util = require('util');
 
 exports = module.exports = function(logger, name) {

@@ -1,5 +1,3 @@
-'use strict';
-
 var keywordExtractor = require('keyword-extractor');
 
 var keywordOptions = {

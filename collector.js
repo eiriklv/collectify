@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Dependencies
  */
@@ -19,7 +17,6 @@ const interprocess = require('interprocess-push-stream');
 /**
  * Application-specific modules
  */
-const helpers = require('./helpers');
 const config = require('./config');
 const setup = require('./setup');
 
@@ -84,6 +81,9 @@ const jsonMapper = require('json-mapper')({ timeOut: 10000 });
 const feedMapper = require('feed-mapper')({ timeOut: 10000 });
 const siteParser = require('site-parser')({ timeOut: 10000 });
 const socialData = require('social-data')(agentOpts);
+const getKeywordsFromString = require('./helpers/get-keywords-from-string');
+const wrapStreamSource = require('./helpers/wrap-stream-source');
+const inspect = require('./helpers/inspect').bind(null, debug);
 
 /**
  * Create some curryed
@@ -91,7 +91,7 @@ const socialData = require('social-data')(agentOpts);
  * for convenience
  * and readability
  */
-const wrap = highland.wrapCallback.bind(highland);
+const wrap = ::highland.wrapCallback;
 const deriveTo = lodash.curry(obtr.deriveTo);
 const deriveToSync = lodash.curry(obtr.deriveToSync);
 const transformTo = lodash.curry(obtr.transformTo);
@@ -101,23 +101,15 @@ const copy = lodash.compose(highland.flip(highland.extend)({}));
 const clone = lodash.compose(JSON.parse, JSON.stringify);
 const getContentFromURL = lodash.curryN(3, lodash.rearg([1, 0, 2], nodeRead))(agentOpts);
 const findOneArticle = lodash.curryN(4, lodash.rearg([2, 1, 0, 3], Articles.findOne.bind(Articles)));
-const createArticle = Articles.create.bind(Articles);
-const countArticles = Articles.count.bind(Articles);
-const updateArticle = Articles.update.bind(Articles);
-const formatArticleForUpdate = Articles.formatForUpdate.bind(Articles);
 const findSources = lodash.curryN(4, lodash.rearg([2, 1, 0, 3], Sources.find.bind(Sources)));
-const transformHTML = siteParser.parse.bind(siteParser);
-const transformRSS = feedMapper.parse.bind(feedMapper);
-const transformJSON = jsonMapper.parse.bind(jsonMapper);
-const getKeywordsFromString = helpers.getKeywordsFromString;
 
 /**
  * Function composition shorthands
  * for readability and reuse
  */
 const isExisting = async.compose(
-  asyncify(helpers.isTruthy),
-  countArticles,
+  asyncify(isTruthy),
+  ::Articles.count,
   asyncify(lodash.pick('guid'))
 );
 
@@ -125,6 +117,8 @@ const isNotExisting = async.compose(
   asyncify(highland.not),
   isExisting
 );
+
+const isTruthy = (x) => !!x;
 
 const addSocialDataFromUrl = deriveTo({
   shares: {
@@ -135,9 +129,9 @@ const addSocialDataFromUrl = deriveTo({
 });
 
 const updateInDatabase = async.compose(
-  asyncify(helpers.isTruthy),
-  updateArticle,
-  formatArticleForUpdate(['guid'])
+  asyncify(isTruthy),
+  ::Articles.update,
+  ::Articles.formatForUpdate(['guid'])
 );
 
 const addContentFromUrl = deriveTo({
@@ -195,7 +189,7 @@ const queryFunction = findSources({})('')({
  * with our query function
  * as the source
  */
-const realSource = highland(helpers.sourceWrapper(queryFunction));
+const realSource = highland(wrapStreamSource(queryFunction));
 
 /**
  * Create a stream from
@@ -244,7 +238,7 @@ const jsonStream = sourceStream
     lodash.isEqual('json'),
     lodash.result('type')
   ))
-  .map(wrap(transformJSON)).parallel(5)
+  .map(wrap(::jsonMapper.parse)).parallel(5)
   .errors(emit('error'))
 
 /**
@@ -264,7 +258,7 @@ const rssStream = sourceStream
     lodash.isEqual('feed'),
     lodash.result('type')
   ))
-  .map(wrap(transformRSS)).parallel(5)
+  .map(wrap(::feedMapper.parse)).parallel(5)
   .errors(emit('error'))
 
 
@@ -285,7 +279,7 @@ const siteStream = sourceStream
     lodash.isEqual('site'),
     lodash.result('type')
   ))
-  .map(wrap(transformHTML)).parallel(5)
+  .map(wrap(::siteParser.parse)).parallel(5)
   .errors(emit('error'))
 
 /**
@@ -331,7 +325,7 @@ const articleStream = highland([
 const createdArticleStream = articleStream
   .fork()
   .flatFilter(wrap(isNotExisting))
-  .flatMap(wrap(createArticle))
+  .flatMap(wrap(::Articles.create))
   .invoke('toObject')
   .errors(emit('error'))
 
@@ -408,7 +402,7 @@ setup.connectToDatabase(
  */
 createdArticleStream
   .fork()
-  .doto(helpers.inspect(debug, 'created-stream'))
+  .doto(inspect('created-stream'))
   .pipe(createdChannel)
 
 /**
@@ -422,7 +416,7 @@ createdArticleStream
  */
 updatedArticleStream
   .fork()
-  .doto(helpers.inspect(debug, 'updated-stream'))
+  .doto(inspect('updated-stream'))
   .pipe(updatedChannel)
 
 /**
@@ -431,7 +425,7 @@ updatedArticleStream
  */
 contentAddedStream
   .fork()
-  .doto(helpers.inspect(debug, 'content-added-stream'))
+  .doto(inspect('content-added-stream'))
   .resume()
 
 /**
@@ -439,5 +433,5 @@ contentAddedStream
  * to the error channel
  */
 errorStream
-  .doto(helpers.inspect(debug, 'error-stream'))
+  .doto(inspect('error-stream'))
   .pipe(errorChannel)

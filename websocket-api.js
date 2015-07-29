@@ -14,8 +14,8 @@ const interprocess = require('interprocess-push-stream');
 /**
  * Application-specific modules
  */
-const helpers = require('./helpers');
 const config = require('./config');
+const inspect = require('./helpers/inspect').bind(null, debug);
 
 /**
  * Create streams for the channels
@@ -82,7 +82,7 @@ const createdArticles = highland(createdChannel)
  */
 createdArticles
   .fork()
-  .doto(helpers.inspect(debug, 'publish-live'))
+  .doto(inspect('publish-live'))
   .resume()
 
 /**
@@ -90,7 +90,7 @@ createdArticles
  * to the error channel
  */
 errorStream
-  .doto(helpers.inspect(debug, 'error-stream'))
+  .doto(inspect('error-stream'))
   .pipe(errorChannel)
 
 /**
@@ -109,7 +109,7 @@ const httpServer = http.createServer()
  */
 const wss = websocket.createServer({
   server: httpServer
-}, function(stream) {
+}, (stream) => {
   let contentStream = createdArticles
     .observe()
     .map(JSON.stringify)
@@ -117,7 +117,7 @@ const wss = websocket.createServer({
   
   contentStream.pipe(stream)
 
-  stream.once('close', function() {
+  stream.once('close', () => {
     contentStream.destroy();
   });
 });

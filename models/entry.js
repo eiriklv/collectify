@@ -1,5 +1,3 @@
-'use strict';
-
 const mongoose = require('mongoose');
 const _ = require('lodash-fp');
 const asap = require('asap');
@@ -65,7 +63,7 @@ const schema = new mongoose.Schema({
 });
 
 schema.set('toObject', {
-  transform: function(doc, ret, options) {
+  transform(doc, ret, options) {
     // delete ret._id;
     delete ret.__v;
     // delete ret.createdAt; enable this if you do not want to update the expiry
@@ -73,7 +71,7 @@ schema.set('toObject', {
 });
 
 schema.set('toJSON', {
-  transform: function(doc, ret, options) {
+  transform(doc, ret, options) {
     // delete ret._id;
     delete ret.__v;
     // delete ret.createdAt; enable this if you do not want to update the expiry
@@ -81,7 +79,7 @@ schema.set('toJSON', {
 });
 
 schema.statics.formatForUpdate = function(picks) {
-  return function(obj, callback) {
+  return (obj, callback) => {
     asap(callback.bind(this, null, _.pick(picks, obj), obj))
   };
 };

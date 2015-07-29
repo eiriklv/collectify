@@ -1,10 +1,8 @@
-'use strict';
-
 const util = require('util');
 const convict = require('convict');
 const debug = require('debug')('collectify:config');
 
-process.on('uncaughtException', function(err) {
+process.on('uncaughtException', (err) => {
   debug('Caught exception without specific handler: ' + util.inspect(err));
   debug(err.stack, 'error');
   process.exit(1);

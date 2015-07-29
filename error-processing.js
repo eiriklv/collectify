@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Dependencies
  */
@@ -11,7 +9,6 @@ const interprocess = require('interprocess-push-stream');
 /**
  * Application-specific modules
  */
-const helpers = require('./helpers');
 const config = require('./config');
 
 /**
@@ -20,7 +17,7 @@ const config = require('./config');
  * for convenience
  * and readability
  */
-const wrap = highland.wrapCallback.bind(highland);
+const wrap = ::highland.wrapCallback;
 
 /**
  * Create streams for the channels
@@ -48,7 +45,7 @@ const errorChannel = interprocess.Receiver({
 const errorMessageStream = highland(createdChannel)
   .compact()
   .flatten()
-  .errors(function(err) {
+  .errors((err) => {
     console.log(err);
   })
 
