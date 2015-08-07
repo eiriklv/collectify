@@ -42,7 +42,7 @@ export MONGO_URL="mongodb://localhost/collectify" \
 export REDIS_URL='redis://localhost:6379' \
 export REDIS_PREFIX='collectify'
 
-babel-node collector
+babel-node -stage 0 collector
 ```
 
 #### Development shellscript example for `api`:
@@ -53,7 +53,7 @@ export DEBUG="*" \
 export NODE_ENV="development" \
 export MONGO_URL="mongodb://localhost/collectify" \
 
-babel-node api
+babel-node -stage 0 api
 ```
 
 #### Development shellscript example for `websocket-api`:
@@ -65,7 +65,7 @@ export NODE_ENV="development" \
 export REDIS_URL='redis://localhost:6379' \
 export REDIS_PREFIX='collectify'
 
-babel-node websocket-api
+babel-node -stage 0 websocket-api
 ```
 
 #### Development shellscript example for `error-processing`:
@@ -77,5 +77,5 @@ export NODE_ENV="development" \
 export REDIS_URL='redis://localhost:6379' \
 export REDIS_PREFIX='collectify'
 
-babel-node error-processing
+babel-node -stage 0 error-processing
 ```

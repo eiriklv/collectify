@@ -4,7 +4,7 @@
   "description": "A news aggregator built with streams",
   "main": "app.js",
   "engines": {
-    "iojs": "1.1.x"
+    "node": "0.12.x"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
