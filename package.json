@@ -16,7 +16,9 @@
     "asfy": "1.0.x",
     "async": "0.9.x",
     "convict": "0.6.x",
+    "cors": "^2.7.1",
     "debug": "2.1.x",
+    "express": "^4.13.3",
     "feed-mapper": "git+https://github.com/eiriklv/feed-mapper",
     "fp-object-transform": "2.4.x",
     "highland": "2.3.x",
@@ -26,10 +28,14 @@
     "lodash": "3.2.x",
     "lodash-fp": "^0.5.1",
     "mongoose": "3.8.24",
-    "node-read": "0.1.x",
+    "node-read": "^0.1.6",
     "site-parser": "git+https://github.com/eiriklv/site-parser",
     "social-data": "^1.0.0",
+    "socket.io": "^1.3.7",
     "websocket-stream": "^1.5.0"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "babel": {
+    "stage": 0
+  }
 }

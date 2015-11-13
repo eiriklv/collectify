@@ -50,14 +50,14 @@ const agentOpts = {
  * and back-pressure between
  * processes
  */
-const updatedChannel = interprocess.Transmitter({
-  channel: 'articles:updated',
+const updateChannel = interprocess.Transmitter({
+  channel: 'articles:update',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const createdChannel = interprocess.Transmitter({
-  channel: 'articles:created',
+const newChannel = interprocess.Transmitter({
+  channel: 'articles:new',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
@@ -73,7 +73,7 @@ const errorChannel = interprocess.Transmitter({
  * mappers/parsers.
  *
  * Here we are going to
- * 
+ *
  * - map from templates to arrays of articles
  * - map from url to social shares data
  */
@@ -107,6 +107,8 @@ const findSources = lodash.curryN(4, lodash.rearg([2, 1, 0, 3], Sources.find.bin
  * Function composition shorthands
  * for readability and reuse
  */
+const isTruthy = (x) => !!x;
+
 const isExisting = async.compose(
   asyncify(isTruthy),
   ::Articles.count,
@@ -117,8 +119,6 @@ const isNotExisting = async.compose(
   asyncify(highland.not),
   isExisting
 );
-
-const isTruthy = (x) => !!x;
 
 const addSocialDataFromUrl = deriveTo({
   shares: {
@@ -208,7 +208,7 @@ const testSource = highland([require('./templates')]);
  * Create a stream
  * from our source
  * of choice
- * 
+ *
  * - limit the rate to 1 fetch / 30 seconds
  * - compact and flatten the stream
  * - limit the rate to 10 templates / 1 seconds
@@ -232,8 +232,7 @@ const sourceStream = realSource
  *
  * Process only 5 templates in parallel
  */
-const jsonStream = sourceStream
-  .fork()
+const jsonStream = sourceStream.fork()
   .filter(lodash.compose(
     lodash.isEqual('json'),
     lodash.result('type')
@@ -252,8 +251,7 @@ const jsonStream = sourceStream
  *
  * Process only 5 templates in parallel
  */
-const rssStream = sourceStream
-  .fork()
+const rssStream = sourceStream.fork()
   .filter(lodash.compose(
     lodash.isEqual('feed'),
     lodash.result('type')
@@ -273,8 +271,7 @@ const rssStream = sourceStream
  *
  * Process only 5 templates in parallel
  */
-const siteStream = sourceStream
-  .fork()
+const siteStream = sourceStream.fork()
   .filter(lodash.compose(
     lodash.isEqual('site'),
     lodash.result('type')
@@ -307,79 +304,42 @@ const articleStream = highland([
 
 /**
  * Create a stream that
- * filters the articleStream
- * and keeps only the articles
- * that does not already exist
+ * extends the articles we
+ * found with additional
+ * data that we want
  *
- * - In this case our predicate
- * is that if we get a count === 0
- * for the 'guid' we define it
- * as new
- *
- * Save all the new entries
- * in the database
- *
- * The result is the data
- * passed back from mongoose
+ * - an updated timestamp
+ * - article content
+ * - social shares data
+ * - keywords from content
  */
-const createdArticleStream = articleStream
-  .fork()
+const extendedArticleStream = articleStream.fork()
+  .map(updateTimestamp)
+  .map(wrap(addSocialDataFromUrl)).parallel(10)
+  .map(wrap(addContentFromUrl)).parallel(10)
+  .map(addKeywordsFromContent)
+  .errors(emit('error'))
+
+/**
+ * Create a new stream that
+ * filters and keeps the
+ * articles that don't already
+ * exist in the database and save them
+ */
+const newArticleStream = extendedArticleStream.fork()
   .flatFilter(wrap(isNotExisting))
   .flatMap(wrap(::Articles.create))
   .invoke('toObject')
   .errors(emit('error'))
 
 /**
- * Create a stream that
- * filters the articleStream
- * and keeps only the articles
- * that already exist in the db
- *
- * - In this case our predicate
- * is that if we get a count > 0
- * for the 'guid' we define it
- * as existing
- *
- * We update all the existing
- * entries with
- *
- * - an updated timestamp
- * - social shares data
- *
- * The result is the data
- * passed back from mongoose
+ * Create a new stream that
+ * filters and keeps the
+ * articles that already
+ * exist in the database and update them them
  */
-const updatedArticleStream = articleStream
-  .fork()
+const updatedArticleStream = extendedArticleStream.fork()
   .flatFilter(wrap(isExisting))
-  .map(updateTimestamp)
-  .map(wrap(addSocialDataFromUrl)).parallel(10)
-  .flatFilter(wrap(updateInDatabase))
-  .errors(emit('error'))
-
-/**
- * Create a stream that
- * forks the updatedArticleStream
- * and updates all the entries
- * in the database with
- * 
- * - article / website content
- * - keywords based on the content
- * 
- * (if it does not have it already)
- *
- * The result is the data
- * passed back from mongoose
- * after updating
- */
-const contentAddedStream = updatedArticleStream
-  .fork()
-  .map(lodash.pick('guid'))
-  .flatMap(wrap(findOneArticle({}, '')))
-  .invoke('toObject')
-  .reject(lodash.has('content'))
-  .map(wrap(addContentFromUrl)).parallel(10)
-  .map(addKeywordsFromContent)
   .flatFilter(wrap(updateInDatabase))
   .errors(emit('error'))
 
@@ -400,10 +360,9 @@ setup.connectToDatabase(
  * Pipe all updated articles
  * to the articles:created channel
  */
-createdArticleStream
-  .fork()
-  .doto(inspect('created-stream'))
-  .pipe(createdChannel)
+newArticleStream.fork()
+  .doto(inspect('new-stream'))
+  .pipe(newChannel)
 
 /**
  * Log all the updated
@@ -414,19 +373,9 @@ createdArticleStream
  * Pipe all updated articles
  * to the articles:updated channel
  */
-updatedArticleStream
-  .fork()
+updatedArticleStream.fork()
   .doto(inspect('updated-stream'))
-  .pipe(updatedChannel)
-
-/**
- * Log all articles
- * updated with content
- */
-contentAddedStream
-  .fork()
-  .doto(inspect('content-added-stream'))
-  .resume()
+  .pipe(updateChannel)
 
 /**
  * Pipe all errors
@@ -434,4 +383,5 @@ contentAddedStream
  */
 errorStream
   .doto(inspect('error-stream'))
+  .doto((err) => console.log(err.stack))
   .pipe(errorChannel)

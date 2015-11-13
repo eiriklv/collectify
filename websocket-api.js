@@ -1,15 +1,15 @@
-'use strict';
-
 /**
  * Dependencies
  */
-const http = require('http');
-const debug = require('debug')('collectify:websocket-api');
+const debug = require('debug')('toppsaker-websocket-api:app');
 const highland = require('highland');
-const lodash = require('lodash-fp');
+const _ = require('lodash-fp');
 const EventEmitter = require('events').EventEmitter;
-const websocket = require('websocket-stream');
-const interprocess = require('interprocess-push-stream');
+const { Receiver } = require('interprocess-push-stream');
+const app = require('express')();
+const cors = require('cors');
+const http = require('http').Server(app);
+const io = require('socket.io')(http, { transports: ['websocket'] });
 
 /**
  * Application-specific modules
@@ -20,23 +20,16 @@ const inspect = require('./helpers/inspect').bind(null, debug);
 /**
  * Create streams for the channels
  * on which we want to
- * distribute / emit data.
- *
- * This uses the push-version
- * of the interface, but you
- * could also use the pull-version,
- * to enable load balancing
- * and back-pressure between
- * processes
+ * listen for data
  */
-const createdChannel = interprocess.Receiver({
-  channel: 'articles:created',
+const newChannel = Receiver({
+  channel: 'articles:new',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
 
-const errorChannel = interprocess.Transmitter({
-  channel: 'errors',
+const updateChannel = Receiver({
+  channel: 'articles:update',
   prefix: config.get('database.redis.prefix'),
   url: config.get('database.redis.url')
 });
@@ -52,7 +45,8 @@ const errorChannel = interprocess.Transmitter({
  * application
  */
 const eventEmitter = new EventEmitter();
-const emit = lodash.curryN(2, eventEmitter.emit.bind(eventEmitter));
+eventEmitter.setMaxListeners(1000);
+const emit = _.curryN(2, eventEmitter.emit.bind(eventEmitter));
 
 /**
  * Create a stream
@@ -69,7 +63,18 @@ const errorStream = highland('error', eventEmitter);
  * with the newChannel
  * as the source
  */
-const createdArticles = highland(createdChannel)
+const newStream = highland(newChannel)
+  .compact()
+  .flatten()
+  .errors(emit('error'))
+
+/**
+ * Create a stream
+ * for monitoring
+ * refreshes
+ * (to force frontend updates on user)
+ */
+const updateStream = highland(updateChannel)
   .compact()
   .flatten()
   .errors(emit('error'))
@@ -80,9 +85,22 @@ const createdArticles = highland(createdChannel)
  * resulting entries in
  * mongodb
  */
-createdArticles
+newStream
   .fork()
-  .doto(inspect('publish-live'))
+  .doto(inspect('collectify-new'))
+  .doto(emit('new'))
+  .resume()
+
+/**
+ * Log all the updated
+ * articles and the
+ * resulting entries in
+ * mongodb
+ */
+updateStream
+  .fork()
+  .doto(inspect('collectify-update'))
+  .doto(emit('update'))
   .resume()
 
 /**
@@ -91,35 +109,98 @@ createdArticles
  */
 errorStream
   .doto(inspect('error-stream'))
-  .pipe(errorChannel)
+  .resume()
 
 /**
- * Create an http server
- * which we'll use to
- * attach a websocket server
+ * Create a route checking
+ * the availability of the app
  */
-const httpServer = http.createServer()
+app.get('/', (req, res) => {
+  res.send('Websocket API up!');
+});
 
 /**
- * Create a websocket server
- * where we 'plug' our content
- * stream into the websocket(s)
- *
- * (We also kill the stream when the client ends)
+ * Create a socket.io server
+ * where we broadcast the updates
+ * to clients
  */
-const wss = websocket.createServer({
-  server: httpServer
-}, (stream) => {
-  let contentStream = createdArticles
-    .observe()
-    .map(JSON.stringify)
-    .doto(highland.log)
-  
-  contentStream.pipe(stream)
+io.on('connection', (socket) => {
+  debug('a user connected');
 
-  stream.once('close', () => {
-    contentStream.destroy();
+  /**
+   * The list of subscriptions for the user
+   * (in memory)
+   */
+  let subscriptionList = [];
+
+  /**
+   * Listen for client subscriptions
+   * to specific sources
+   */
+  socket.on('subscribe', (subscriptions) => {
+    if (Array.isArray(subscriptions)) {
+      subscriptionList = subscriptions;
+    }
+  });
+
+  /**
+   * Create an event handler
+   * for receiving updates
+   * (named - so we can handle disconnects)
+   */
+  let newReceiver = (data) => {
+    if (!_.contains(data._source, subscriptionList)) {
+      return debug('got new article - but user is not subscribing to it');
+    }
+
+    debug('emitting new article', data);
+    socket.emit('new', data);
+  };
+
+  /**
+   * Create an event handler
+   * for receiving updates
+   * (named - so we can handle disconnects)
+   */
+  let updateReceiver = (data) => {
+    if (!_.contains(data._source, subscriptionList)) {
+      return debug('got updated article - but user is not subscribing to it');
+    }
+
+    debug('emitting updated article', data);
+    socket.emit('update', data);
+  };
+
+  /**
+   * Attach the event handlers
+   * to events
+   */
+  eventEmitter.on('new', newReceiver);
+  eventEmitter.on('update', updateReceiver)
+
+  /**
+   * Handle socket.io disconnect
+   * and clean up
+   */
+  socket.on('disconnect', () => {
+    debug('user disconnected');
+
+    /**
+     * Remove event listeners
+     * (to avoid memory leaks)
+     */
+    eventEmitter.removeListener('new', newReceiver);
+    eventEmitter.removeListener('update', updateReceiver);
+
+    /**
+     * Avoid potential memory leak
+     * by 'nulling' out the array
+     */
+    subscriptionList = null;
   });
 });
 
-server.listen(3333);
+/**
+ * Attach server to port
+ */
+http.listen(3002);
